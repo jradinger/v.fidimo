@@ -868,8 +868,7 @@ def fidimo_probability(	input,
 						fidimo_prob = 	fidimo_kernel_cdf(	x = fidimo_distance_array[:,col_names["upr_limit"]],
 															sigma_stat = sigma_dict["stat"][l][i],
 															sigma_mob = sigma_dict["mob"][l][i],
-															p = p) - 
-										fidimo_kernel_cdf(	x = fidimo_distance_array[:,col_names["lwr_limit"]],
+															p = p) - fidimo_kernel_cdf(	x = fidimo_distance_array[:,col_names["lwr_limit"]],
 															sigma_stat = sigma_dict["stat"][l][i],
 															sigma_mob = sigma_dict["mob"][l][i],
 															p = p)
