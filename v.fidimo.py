@@ -845,7 +845,7 @@ def fidimo_probability(	input,
 			chunk_size=500
 			row_ids_chunks = [row_ids[x:x+chunk_size] for x in xrange(0, len(row_ids), chunk_size)]
 			
-			for k in row_ids_chunks
+			for k in row_ids_chunks:
 				fidimo_db.execute('SELECT * FROM fidimo_distance WHERE fidimo_distance_id IN (%s)' %','.join('?'*len(k)), tuple(k))
 				fidimo_distance_colnames = dict(zip([x[0] for x in fidimo_db.description], range(0,len(fidimo_db.description))))
 				fidimo_distance_array = scipy.array(fidimo_db.fetchall())
