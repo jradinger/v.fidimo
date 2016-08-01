@@ -8,7 +8,7 @@
 #               
 # VERSION:      V0.1 Beta
 #
-# DATE:         2013-04-11
+# DATE:         2016-08-01
 #
 #############################################################################
 #%Module
@@ -817,7 +817,7 @@ def fidimo_probability(	input,
 			truncation = float(truncation)
 			max_dist = float(optimize.zeros.newton(fidimo_kernel_cdf_truncation, 1.,  
 				args=(sigma_dict["stat"]["fit"][i],sigma_dict["mob"]["fit"][i],truncation,p)))
-		else
+		else:
 			fidimo_db.execute('''SELECT max(distance) FROM fidimo_distance WHERE source_strahler = ?''', str(i))
    			max_dist = [x[0] for x in fidimo_db.fetchall()][0]*2 # Get a distance that is definintly (2x) larger than max distance
    			
