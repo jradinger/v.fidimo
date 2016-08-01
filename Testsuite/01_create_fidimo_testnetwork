@@ -1,0 +1,28 @@
+#1/bin/bash
+# This script creates the river networks suitable for FIDIMO
+# for different stream networks in the "streams@PERMANENT"
+# vector map layer in the nc location
+
+# Create outflow points to indentify specific network
+cat > points.csv << EOF
+640793.668808|214874.886819
+642228.347134|214979.370612
+EOF
+v.in.ascii --overwrite output=stream_outflow input=points.csv x=1 y=2
+
+# Calculate stream order
+v.stream.order --overwrite input=streams@PERMANENT points=stream_outflow output=fidimo_testnetwork
+
+# Create barriers along the river network
+cat > barriers.csv << EOF
+642658.572872|216657.870334
+643015.853113|216613.563813
+643025.73136|217930.699074
+642334.713831|215728.242453
+EOF
+v.in.ascii --overwrite output=fidimo_testbarriers input=points.csv x=1 y=2
+
+# Define reaches inhabitated by source populations
+v.db.addcolumn map=fidimo_testnetwork columns="source_populations DOUBLE"
+v.db.update map=fidimo_testnetwork column=source_populations value=1 where="cat IN (952,953,682,706,633,727,1010,642,587)"
+

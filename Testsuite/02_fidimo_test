@@ -1,0 +1,67 @@
+
+###########################################
+########## Run FIDIMO from input ##########
+###########################################
+
+# Stream settings
+barriers="fidimo_testbarriers"
+passability_col="passability"
+input="fidimo_testnetwork"
+threshold=25
+strahler_col="strahler"
+shreve_col="shreve"
+network_col="network"
+passability_col="passability"
+
+# Dispersal settings
+l=200
+ar=1.25
+t=30
+statistical_interval="no"
+
+#fidimo database connection
+fidimo_db_path='/home/radinger/Documents/FIDIMO_DB/fidimo_sqlite.db'
+
+# Source population settings
+source_col="source_populations"
+
+
+# Create fidimo network from input data (river shape, barrier points)
+fidimo_network(input=input,
+				strahler_col=strahler_col,
+				shreve_col=shreve_col,
+				network_col=network_col,
+				barriers=barriers,
+				passability_col=passability_col,
+				threshold=threshold)
+
+# Set up fidimo_db and copying edges and vertices to fidimo_db
+set_fidimo_db(fidimo_db_path=fidimo_db_path)
+					
+# Calculate distance between single river reaches
+fidimo_distance(fidimo_db_path = fidimo_db_path)
+
+# Calculate dispersal distances
+my_sigma_dict = sigma_calc(	l=l,
+							ar=ar,
+							t=t,
+							statistical_interval=statistical_interval,
+							fishmove_seed=999)
+
+# Append source populatoins
+fidimo_source_pop(input=input,
+				source_col=source_col,
+				output="fidimo_test_output",
+				fidimo_db_path=fidimo_db_path)
+
+# Calcuate fidimo probability
+fidimo_probability(input=input,
+				output="fidimo_test_output",
+				fidimo_db_path=fidimo_db_path,
+				sigma_dict=my_sigma_dict,
+				p=0.67,
+				statistical_interval=statistical_interval)
+
+
+
+
