@@ -838,7 +838,7 @@ def fidimo_probability(	input,
 				WHERE source_strahler = ?
 					AND distance <= ? 
 					AND direction = ?
-					AND source_pop > 0''', (int(i),max_dist,int(direction_dict(j)))
+					AND source_pop > 0''', (int(i),max_dist,int(direction_dict(j))))
 			
 			# Split all cases into chunks of max. chunk_size		
 			row_ids = [x[0] for x in fidimo_db.fetchall()]
