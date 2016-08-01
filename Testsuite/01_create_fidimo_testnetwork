@@ -20,7 +20,12 @@ cat > barriers.csv << EOF
 643025.73136|217930.699074
 642334.713831|215728.242453
 EOF
-v.in.ascii --overwrite output=fidimo_testbarriers input=points.csv x=1 y=2
+v.in.ascii --overwrite output=fidimo_testbarriers input=barriers.csv x=1 y=2
+v.db.addtable map=fidimo_testbarriers
+
+# Add passability to barriers
+v.db.addcolumn map=fidimo_testbarriers columns="passability DOUBLE"
+v.db.update map=fidimo_testbarriers column=passability value=0.5
 
 # Define reaches inhabitated by source populations
 v.db.addcolumn map=fidimo_testnetwork columns="source_populations DOUBLE"
