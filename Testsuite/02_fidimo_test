@@ -15,6 +15,8 @@ strahler_col="strahler"
 shreve_col="shreve"
 network_col="network"
 passability_col="passability"
+source_col="source_populations"
+truncation=0.999
 
 # Dispersal settings
 l=200
@@ -25,9 +27,6 @@ statistical_interval="no"
 #fidimo database connection
 fidimo_db_path='/home/radinger/Documents/FIDIMO_DB/fidimo_sqlite.db'
 
-# Source population settings
-source_col="source_populations"
-
 
 # Create fidimo network from input data (river shape, barrier points)
 fidimo_network(input=input,
@@ -37,6 +36,7 @@ fidimo_network(input=input,
 				barriers=barriers,
 				passability_col=passability_col,
 				threshold=threshold)
+
 
 # Set up fidimo_db and copying edges and vertices to fidimo_db
 set_fidimo_db(fidimo_db_path=fidimo_db_path)
