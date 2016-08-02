@@ -5,8 +5,8 @@
 
 # Create outflow points to indentify specific network
 cat > points.csv << EOF
-640793.668808|214874.886819
 642228.347134|214979.370612
+643006.172641|214976.675997
 EOF
 v.in.ascii --overwrite output=stream_outflow input=points.csv x=1 y=2
 
