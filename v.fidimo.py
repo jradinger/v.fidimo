@@ -176,7 +176,8 @@ def import_vector(  input_map, #input vector name
 		table=output_map).splitlines()
 	
 	if sum([x not in old_columns for x in columns.values()])>0:
-		grass.fatal(_("At least one specified column does not exist in input map"))
+		#grass.fatal(_("At least one specified column does not exist in input map"))
+		raise ValueError("At least one specified column does not exist in input map")
 	
 	if sorted(columns.values()+["cat"])==sorted(old_columns):
 		pass
@@ -212,7 +213,6 @@ def fidimo_network( input,
 					barriers=None,
 					passability_col=None,
 					threshold=25):
-	
 	'''GRASS Network based on the preprocessed vector input of streams
 	and barriers (if present) is calculated (v.net). 
 	Barriers (if present) are snapped to stream network (within threshold) and reaches 
@@ -220,7 +220,8 @@ def fidimo_network( input,
 	lengths of reaches are updated. Nodes and barriers are stored in attribute
 	table and can be distinuished by the v_type column (1: barrier, 2: node)'''
 	
-	grass.message(_("Preparing river network for FIDIMO"))
+	#grass.message(_("Preparing river network for FIDIMO"))
+	print("Preparing river network for FIDIMO")
 	
 	# Input stream network      
 	streams_col_dict = {"strahler":strahler_col,"shreve":shreve_col,"network":network_col} #dictionary {'target_name':'input_name'}
@@ -240,7 +241,8 @@ def fidimo_network( input,
 	
 	# Connect barriers (if present) and nodes to network
 	if barriers:
-		grass.message(_("Connect barriers and nodes to network"))
+		#grass.message(_("Connect barriers and nodes to network"))
+		print("Connect barriers and nodes to network")
 		# Input barriers
 		passability_col_dict = {"passability":passability_col} #dictionary {'target_name':'input_name'}
 		import_vector(input_map=barriers, columns=passability_col_dict, output_map="barriers_tmp")
@@ -273,7 +275,8 @@ def fidimo_network( input,
 			output="fidimo_net2",
 			operation="nodes")
 	else:
-		grass.message(_("Connect nodes to network"))
+		#grass.message(_("Connect nodes to network"))
+		print("Connect nodes to network")
 		v.net(overwrite=True,
 			quiet=True,
 			flags="c",
@@ -318,7 +321,8 @@ def fidimo_network( input,
 	mapset_db_settings = dict(x.split(": ") for x in grass.read_command("db.connect",
 			flags="p").splitlines())
 	if mapset_db_settings["driver"]!="sqlite":
-		grass.fatal(_("Database driver of current mapset is not 'sqlite'."))
+		#grass.fatal(_("Database driver of current mapset is not 'sqlite'."))
+		raise ValueError("Database driver of current mapset is not 'sqlite'.")
 	mapset_database = sqlite3.connect(mapset_db_settings["database"])
 	mapset_db = mapset_database.cursor()
 	
@@ -390,8 +394,9 @@ def fidimo_network( input,
 			other_column="orig_cat",
 			subset_columns="network")
 	
-	grass.message(_("Final networks prepared for FIDIMO"))
-	
+	#grass.message(_("Final networks prepared for FIDIMO"))
+	print("Final networks prepared for FIDIMO")
+
 	#removing networks and left over maps
 	#g.remove
 
@@ -410,7 +415,8 @@ def set_fidimo_db(fidimo_db_path):
 	except OSError:
 		pass
 	
-	grass.message(_("Creating FIDIMO Database and copying edges and vertices"))
+	#grass.message(_("Creating FIDIMO Database and copying edges and vertices"))
+	print("Creating FIDIMO Database and copying edges and vertices")
 	
 	fidimo_database = sqlite3.connect(fidimo_db_path)
 	fidimo_db = fidimo_database.cursor()
@@ -450,7 +456,8 @@ def add_midpoints_fidimo_db(fidimo_db_path):
 	Each midpoint has its own id that is linked to the cat of the 
 	river reach. Function is used in fidimo_distance'''
 		
-	grass.message(_("Add midpoints (vertices) for each river reach"))
+	#grass.message(_("Add midpoints (vertices) for each river reach"))
+	print("Add midpoints (vertices) for each river reach")
 	
 	fidimo_database = sqlite3.connect(fidimo_db_path)
 	fidimo_db = fidimo_database.cursor()
@@ -527,13 +534,15 @@ def fidimo_distance(fidimo_db_path):
 	add_midpoints_fidimo_db(fidimo_db_path)
 	
 	# Update main distance matrix
-	grass.message(_("Update main distance matrix (fidimo_distance) between all connected river reaches..."))
+	#grass.message(_("Update main distance matrix (fidimo_distance) between all connected river reaches..."))
+	print("Update main distance matrix (fidimo_distance) between all connected river reaches...")
 	
 	fidimo_db.execute('SELECT DISTINCT network FROM edges')
 	network_id = [x[0] for x in fidimo_db.fetchall()]
 	
 	for i in network_id:
-		grass.message(_("   ...processing network ID: %s" %str(i)))
+		#grass.message(_("   ...processing network ID: %s" %str(i)))
+		print("   ...processing network ID: %s" %str(i))
 		
 		# Fetch all edges
 		fidimo_db.execute('SELECT from_v, to_v, edge_length FROM edges WHERE network = ?', str(i))
@@ -561,7 +570,9 @@ def fidimo_distance(fidimo_db_path):
 		g.es["half_length"] = [(x[2])/2.0 for x in edges_attributes]
 		
 		### Calculate shortest paths
-		grass.message(_("Calculating shortest paths"))
+		#grass.message(_("Calculating shortest paths"))
+		print("Calculating shortest paths")
+		
 		distance_mat_upstream = g.shortest_paths(source=g_midpoints,
 						target=g_midpoints, weights="half_length",mode="IN")
 		distance_mat_downstream = g.shortest_paths(source=g_midpoints,
@@ -569,15 +580,18 @@ def fidimo_distance(fidimo_db_path):
 		distance_mat_all = g.shortest_paths(source=g_midpoints,
 						target=g_midpoints, weights="half_length",mode="ALL")
 				
-		# Distinguish between paths up- and downstream [1: downstream, 2:upstram, 3:neither (down-up combination), 4: both directions (e.g. where source=target and dist=0)
-		grass.message(_("Calculating directions between reaches"))
+		# Distinguish between paths up- and downstream [1: downstream, 2:upstream, 3:neither (down-up combination), 4: both directions (e.g. where source=target and dist=0)
+		#grass.message(_("Calculating directions between reaches"))
+		print("Calculating directions between reaches")
+		
 		direction_mat = numpy.select([  numpy.isinf(distance_mat_upstream)&~numpy.isinf(distance_mat_downstream),
 										numpy.isinf(distance_mat_downstream)&~numpy.isinf(distance_mat_upstream),
 										numpy.isinf(distance_mat_upstream)&numpy.isinf(distance_mat_downstream),
 										~numpy.isinf(distance_mat_upstream)&~numpy.isinf(distance_mat_downstream)],
 									[1,2,3,4],default=-99999)
 		
-		grass.message(_("Updating distance matrix for specific network"))
+		#grass.message(_("Updating distance matrix for specific network"))
+		print("Updating distance matrix for specific network")
 		paths_to_db = zip(      [x for item in midpoints for x in repeat(item,len(midpoints))],  #  list of all source/from midpoints of reaches
 								midpoints*len(midpoints), #  list of all target/to midpoints of reaches
 								[item for sublist in distance_mat_all for item in sublist], # list of distances
@@ -592,7 +606,8 @@ def fidimo_distance(fidimo_db_path):
 		barriers_list = [x[0] for x in fidimo_db.fetchall()]
 		
 		if barriers_list:
-			grass.message(_("Processing barriers along networks paths"))
+			#grass.message(_("Processing barriers along networks paths"))
+			print("Processing barriers along networks paths")
 			
 			g_barriers = [vertices_dict[x] for x in barriers_list]
 			
@@ -605,18 +620,21 @@ def fidimo_distance(fidimo_db_path):
 		
 				fidimo_db.executemany('''INSERT INTO barriers_along (source,target,barrier) VALUES (?,?,?)''',barriers_along)
 		
-	grass.message(_("All networks processed"))
+	#grass.message(_("All networks processed"))
+	print("All networks processed")
 	
 	##### Update values for main fidimo table (e.g. lengths, stream order,...)
 	start = timer()
 	
 	#Create index on fidimo_distance
 	#grass.message(_("Creating DB Index on fidimo_distance"))
+	#print("Creating DB Index on fidimo_distance")
 	#fidimo_db.execute('''CREATE INDEX fidimo_distance_index_source ON fidimo_distance (source)''')
 	#fidimo_db.execute('''CREATE INDEX fidimo_distance_index_target ON fidimo_distance (target)''')
 	
 	# Get cats of original vertices (from-to)
-	grass.message(_("Updating original vertex categories to fidimo_distance"))
+	#grass.message(_("Updating original vertex categories to fidimo_distance"))
+	print("Updating original vertex categories to fidimo_distance")
 	fidimo_db.execute('''UPDATE fidimo_distance SET 
 								from_orig_v = (SELECT orig_cat FROM vertices WHERE cat=fidimo_distance.source),
 								to_orig_v = (SELECT orig_cat FROM vertices WHERE cat=fidimo_distance.target)''')
@@ -624,17 +642,20 @@ def fidimo_distance(fidimo_db_path):
 	
 	#Create index on fidimo_distance
 	#grass.message(_("Creating DB Index on fidimo_distance"))
+	#print("Creating DB Index on fidimo_distance")
 	#fidimo_db.execute('''CREATE INDEX fidimo_distance_index_from_orig_v ON fidimo_distance (from_orig_v)''')
 	#fidimo_db.execute('''CREATE INDEX fidimo_distance_index_to_orig_v ON fidimo_distance (to_orig_v)''')
 	
 	# Get cats of original edges (from-to)
-	grass.message(_("Updating original river reach (edges) categories fidimo_distance"))
+	#grass.message(_("Updating original river reach (edges) categories fidimo_distance"))
+	print("Updating original river reach (edges) categories fidimo_distance")
 	fidimo_db.execute('''UPDATE fidimo_distance SET 
 								from_orig_e = (SELECT orig_cat FROM edges WHERE cat=fidimo_distance.from_orig_v),
 								to_orig_e = (SELECT orig_cat FROM edges WHERE cat=fidimo_distance.to_orig_v)''')
 	
 	# Get edge lengths, stream order and network id for source (and target) reach
-	grass.message(_("Updating addtional attributes (e.g. stream order) in fidimo_distance"))
+	#grass.message(_("Updating addtional attributes (e.g. stream order) in fidimo_distance"))
+	print("Updating addtional attributes (e.g. stream order) in fidimo_distance")
 	fidimo_db.execute('''UPDATE fidimo_distance SET
 								source_edge_length = (SELECT edge_length FROM edges WHERE cat=fidimo_distance.from_orig_v AND part=1),
 								target_edge_length = (SELECT edge_length FROM edges WHERE cat=fidimo_distance.to_orig_v AND part=1),
@@ -644,7 +665,8 @@ def fidimo_distance(fidimo_db_path):
 								network = (SELECT network FROM edges WHERE cat=fidimo_distance.from_orig_v AND part=1)''')
 	
 	# Get upr and lwr limit for later integration based on the reach lengths and distance
-	grass.message(_("Updating addtional attributes (upper and lower distance limit) in fidimo_distance"))
+	#grass.message(_("Updating addtional attributes (upper and lower distance limit) in fidimo_distance"))
+	print("Updating addtional attributes (upper and lower distance limit) in fidimo_distance")
 	fidimo_db.execute('''UPDATE fidimo_distance SET
 								lwr_limit = distance-(target_edge_length/2),
 								upr_limit = distance+(target_edge_length/2)''')
@@ -654,7 +676,8 @@ def fidimo_distance(fidimo_db_path):
 	
 	end = timer()
 	
-	grass.message(_("Time elapsed: %s" %str(end-start)))
+	#grass.message(_("Time elapsed: %s" %str(end-start)))
+	print("Time elapsed: %s" %str(end-start))
 
 
 
@@ -747,6 +770,9 @@ def fidimo_source_pop(	input,
 	source_col_dict = {"source_pop":source_col} #dictionary {'target_name':'input_name'}
 	import_vector(input_map=input, columns=source_col_dict, output_map=output)
 	
+	# Delete fidimo_source_pop if exists
+	fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_source_pop''')
+	
 	# Copy source populations to FIDIMO DB ####
 	grass.run_command("db.copy",
 		overwrite=True,
@@ -754,8 +780,11 @@ def fidimo_source_pop(	input,
 		to_database=fidimo_db_path,
 		to_table="fidimo_source_pop")
 	
+	fidimo_db.execute('''UPDATE fidimo_source_pop SET source_pop=0.0 WHERE source_pop IS NULL OR source_pop='';''')
+	fidimo_database.commit()
+	
 	# Creating index on fidimo_source_pop
-	fidimo_db.execute('''CREATE INDEX fidimo_source_pop ON fidimo_source_pop (orig_cat)''')
+	fidimo_db.execute('''CREATE INDEX index_fidimo_source_pop ON fidimo_source_pop (orig_cat)''')
 	
 	#check if cat of cats of fidimo_source_pop == from_orig of fidimo_distance
 	fidimo_db.execute('SELECT DISTINCT from_orig_e FROM fidimo_distance')
@@ -763,16 +792,23 @@ def fidimo_source_pop(	input,
 	fidimo_db.execute('SELECT DISTINCT orig_cat FROM fidimo_source_pop')
 	orig_cat_fidimo_source_pop = [x[0] for x in fidimo_db.fetchall()]
 	if sorted(from_orig_e_fidimo_distance) != sorted(orig_cat_fidimo_source_pop):
-		grass.fatal(_("Vector input map of source populations must must match vector input map that has been used for calculating fidimo distance matrix"))
-	#else:
-	#	print ("Vector input map of source populations matches vector input map that has been used for calculating fidimo distance matrix")
+		#grass.fatal(_("Vector input map of source populations must must match vector input map that has been used for calculating fidimo distance matrix"))
+		raise ValueError("Vector input map of source populations must must match vector input map that has been used for calculating fidimo distance matrix")
+	else:
+		print("Vector input map of source populations matches vector input map that has been used for calculating fidimo distance matrix")
 		
 	# Join table fidimo_distance with fidimo_source_pop
-	grass.message(_("Updating source population in fidimo_distance"))
-	fidimo_db.execute('''ALTER TABLE fidimo_distance ADD COLUMN source_pop DOUBLE''')
-	fidimo_db.execute('''UPDATE fidimo_distance SET
-								source_pop = (SELECT source_pop FROM fidimo_source_pop WHERE orig_cat=fidimo_distance.from_orig_e)''')
+	#grass.message(_("Updating source population in fidimo_distance"))
+	print("Updating source population in fidimo_distance")
 	
+	# First check if source_pop already exists in fidimo distance and create if not exist
+	fidimo_db.execute('SELECT * FROM fidimo_distance LIMIT 1')
+	if "source_pop" not in [x[0] for x in fidimo_db.description]:
+		fidimo_db.execute('''ALTER TABLE fidimo_distance ADD COLUMN source_pop DOUBLE''')
+		
+	fidimo_db.execute('''UPDATE fidimo_distance SET source_pop = (SELECT source_pop FROM fidimo_source_pop WHERE orig_cat=fidimo_distance.from_orig_e)''')
+	fidimo_database.commit()
+	fidimo_database.close()
 
 
 def fidimo_probability(	input,
@@ -780,13 +816,28 @@ def fidimo_probability(	input,
 						fidimo_db_path,
 						sigma_dict,
 						p,
-						statistical_interval):
+						statistical_interval,
+						truncation="inf"):
 	'''This function calculates dispersal kernel probabilities
 	for each river reach and corresponding distances between reaches'''
 	
 	# connect to database
 	fidimo_database = sqlite3.connect(fidimo_db_path)
 	fidimo_db = fidimo_database.cursor()
+	
+	# Get stream orders (ASC) of source populations where source_pop > 0
+	fidimo_db.execute('''SELECT DISTINCT source_strahler FROM fidimo_distance WHERE source_pop > 0''')
+	so_list = sorted([x[0] for x in fidimo_db.fetchall()])
+	if None in so_list:
+		raise ValueError("At least one stream reach with a source population has no value for Strahler stream order")
+	elif max([int(x) for x in so_list]) > 9:
+		#grass.fatal(_("Stream network has stream orders > 9. Please consider smaller stream network"))
+		raise ValueError("Stream network has stream orders > 9. Please consider smaller stream network")
+	else:
+		so_list = [int(x) for x in so_list]
+	
+	# Delete fidimo_prob if exists
+	fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_prob''')
 	
 	# Get number of runs for statistical intervals
 	if statistical_interval == "no":
@@ -800,34 +851,27 @@ def fidimo_probability(	input,
 	
 	# Commit changes
 	fidimo_database.commit()
-	
-	# Get stream orders (ASC) of source populations where source_pop > 0
-	fidimo_db.execute('''SELECT DISTINCT source_strahler FROM fidimo_distance WHERE source_pop > 0 AND source_pop IS NOT NULL AND source_pop != ""''')
-	so_list = sorted([int(x[0]) for x in fidimo_db.fetchall()])
-	return so_list
-	
-	if max(so_list) > 9:
-		grass.fatal(_("Stream network has stream orders > 9. Please consider smaller stream network"))
-	
+		
 	for i in so_list:
 		#i=3
 		
-		# Calculate maximum distance (cutting distance) based on truncation criterion 
+		# Calculate maximum distance (cutting distance) based on truncation criterion (based on p=0.67)
 		if truncation != "inf":
 			truncation = float(truncation)
 			max_dist = float(optimize.zeros.newton(fidimo_kernel_cdf_truncation, 1.,  
-				args=(sigma_dict["stat"]["fit"][i],sigma_dict["mob"]["fit"][i],truncation,p)))
+				args=(sigma_dict["stat"]["fit"][i],sigma_dict["mob"]["fit"][i],truncation,0.67)))
 		else:
 			fidimo_db.execute('''SELECT max(distance) FROM fidimo_distance WHERE source_strahler = ?''', str(i))
    			max_dist = [x[0] for x in fidimo_db.fetchall()][0]*2 # Get a distance that is definintly (2x) larger than max distance
    			
-		direction_dict = {"upstream":1,"downstream":2,"source":3,"undef":4}
+		direction_dict = {"downstream":1,"upstream":2,"undef":3,"source":4}
 		
 		for j in direction_dict: # loop over directions (up- vs. downstream)
 			''' calculate fidimo probability in chunks based on source_strahler
 			MAIN PART: leptokurtic probability density kernel based on fishmove '''
-			
-			grass.debug(_("Begin with core of fidimo, application of fishmove"))
+			#j="upstream"
+			#grass.debug(_("Begin with core of fidimo, application of fishmove"))
+			print("Begin with core of fidimo, application of fishmove")
 			
 			# Do not calculate any fidimo probability for direction that are combinations of down- and upstream (as in r.fidimo)
 			if j=="undef":
@@ -838,7 +882,7 @@ def fidimo_probability(	input,
 				WHERE source_strahler = ?
 					AND distance <= ? 
 					AND direction = ?
-					AND source_pop > 0''', (int(i),max_dist,int(direction_dict(j))))
+					AND source_pop > 0''', (i,max_dist,direction_dict[j]))
 			
 			# Split all cases into chunks of max. chunk_size		
 			row_ids = [x[0] for x in fidimo_db.fetchall()]
@@ -851,44 +895,47 @@ def fidimo_probability(	input,
 				fidimo_distance_array = scipy.array(fidimo_db.fetchall())
 				
 				# Create results array to collect fidimo_prob results
-				fidimo_result_array = k
+				fidimo_result_array = scipy.array(k)
 				
 				for l in nrun:
+					# l="fit"
 					# CDF(upr) - CDF(lwr)
 					if j=="source":
-						fidimo_prob = 	(fidimo_kernel_cdf(	x = fidimo_distance_array[:,col_names["upr_limit"]],
+						fidimo_prob = 	(fidimo_kernel_cdf(	x = fidimo_distance_array[:,fidimo_distance_colnames["upr_limit"]],
 															sigma_stat = sigma_dict["stat"][l][i],
 															sigma_mob = sigma_dict["mob"][l][i],
-															p = p) - 
-										fidimo_kernel_cdf(	x = 0,
+															p = p) - fidimo_kernel_cdf(	x = 0,
 															sigma_stat = sigma_dict["stat"][l][i],
 															sigma_mob = sigma_dict["mob"][l][i],
 															p = p))*2.0
-					else:
-						fidimo_prob = 	fidimo_kernel_cdf(	x = fidimo_distance_array[:,col_names["upr_limit"]],
+					elif j=="upstream" or j=="downstream":
+						fidimo_prob = 	fidimo_kernel_cdf(	x = fidimo_distance_array[:,fidimo_distance_colnames["upr_limit"]],
 															sigma_stat = sigma_dict["stat"][l][i],
 															sigma_mob = sigma_dict["mob"][l][i],
-															p = p) - fidimo_kernel_cdf(	x = fidimo_distance_array[:,col_names["lwr_limit"]],
+															p = p) - fidimo_kernel_cdf(	x = fidimo_distance_array[:,fidimo_distance_colnames["lwr_limit"]],
 															sigma_stat = sigma_dict["stat"][l][i],
 															sigma_mob = sigma_dict["mob"][l][i],
 															p = p)
 					
 					# if upstream direction than correct for network splits by a shreve stream order approach
 					if j=="upstream":
-						fidimo_prob = fidimo_prob * (fidimo_distance_array[:,col_names["target_shreve"]]]*1.0 / fidimo_distance_array[:,col_names["source_shreve"]]])
+						fidimo_prob = fidimo_prob * (fidimo_distance_array[:,fidimo_distance_colnames["target_shreve"]]*1.0 / fidimo_distance_array[:,fidimo_distance_colnames["source_shreve"]])
 					
 					# Stack fidimo_prob with fidimo_distance id into result array
-					fidimo_result_array = numpy.concatenate(
-											fidimo_result_array, # fidimo_distance_id
-											fidimo_prob) # fidimo_prob for single nrun
+					fidimo_result_array = numpy.column_stack(
+											(fidimo_result_array, # fidimo_distance_id
+											fidimo_prob)) # fidimo_prob for single nrun
 				
 				if statistical_interval == "no":
- 					fidimo_db.executemany("INSERT INTO fidimo_prob VALUES (?,?)", fidimo_result_array)
+ 					fidimo_db.executemany("INSERT INTO fidimo_prob VALUES (?,?)", map(tuple, fidimo_result_array.tolist()))
  				else:
- 					fidimo_db.executemany("INSERT INTO fidimo_prob VALUES (?,?,?,?)", fidimo_result_array)
+ 					fidimo_db.executemany("INSERT INTO fidimo_prob VALUES (?,?,?,?)", map(tuple, fidimo_result_array.tolist()))
  				
  				# Commit changes
 				fidimo_database.commit()
+				
+	#Close database connection
+	fidimo_database.close()
 				
 	# Create key in final fidimo_prob
 	
@@ -911,6 +958,7 @@ strahler_col="strahler"
 shreve_col="shreve"
 network_col="network"
 passability_col="passability"
+source_col="source_populations"
 
 # Dispersal settings
 l=200
@@ -921,8 +969,6 @@ statistical_interval="no"
 #fidimo database connection
 fidimo_db_path='/home/radinger/Documents/FIDIMO_DB/fidimo_sqlite.db'
 
-# Source population settings
-source_col="sources_test"
 
 
 # Create fidimo network from input data (river shape, barrier points)
