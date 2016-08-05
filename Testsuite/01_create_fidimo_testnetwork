@@ -27,7 +27,9 @@ v.db.addtable map=fidimo_testbarriers
 v.db.addcolumn map=fidimo_testbarriers columns="passability DOUBLE"
 v.db.update map=fidimo_testbarriers column=passability value=0.5
 
-# Define reaches inhabitated by source populations
+# Define reaches inhabitated by source populations (with probability and with real fish counts)
 v.db.addcolumn map=fidimo_testnetwork columns="source_populations DOUBLE"
 v.db.update map=fidimo_testnetwork column=source_populations value=1 where="cat IN (952,953,682,706,633,727,1010,642,587)"
+v.db.addcolumn map=fidimo_testnetwork columns="source_populations2 DOUBLE"
+v.db.update map=fidimo_testnetwork column=source_populations2 value=5000 where="cat IN (952,953,682,706,633,727,1010,642,587)"
 
