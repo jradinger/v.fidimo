@@ -214,6 +214,7 @@ def import_vector(  input_map, #input vector name
 
 
 def fidimo_network( input,
+					output,
 					strahler_col,
 					shreve_col,
 					network_col,
@@ -401,11 +402,48 @@ def fidimo_network( input,
 			other_column="orig_cat",
 			subset_columns="network")
 	
+	# Copy final network to output map and clean associated tables
+	###### CHECK IF OUTPUT EXISTS AND HANDLING OF OVERWRITE FLAGE #####
+	grass.run_command("g.copy",
+		quiet=True,
+		overwrite=True,
+		vector="fidimo_net3,"+output)
+	grass.run_command("db.copy",
+		quiet=True,
+		overwrite=True,
+		from_table="edges",
+		to_table="fidimo_output")
+	for i in [1,2,3]:
+		grass.run_command("v.db.droptable",
+					quiet=True,
+					flags="f",
+					map=output,
+					layer=i)
+		
+	grass.run_command("v.db.connect",
+				overwrite=True,
+				map=output,
+				table="fidimo_output")
+	output_columns = grass.read_command("db.columns",
+		table=output).splitlines()
+	grass.run_command("v.db.dropcolumn",
+			quiet=True,
+			map=output,
+			columns=[x for x in output_columns if x not in ["cat","orig_cat"]])
+	grass.run_command("v.db.addcolumn",
+		quiet=True,
+		map=output,
+		columns='''reach_length DOUBLE, source_pop DOUBLE, fidimo_result DOUBLE, fidimo_result_lwr DOUBLE, 
+		fidimo_result_upr DOUBLE, rel_fidimo_result DOUBLE, rel_fidimo_result_lwr DOUBLE, rel_fidimo_result_upr DOUBLE''')
+	
 	#grass.message(_("Final networks prepared for FIDIMO"))
 	print("Final networks prepared for FIDIMO")
-
+	
 	#removing networks and left over maps
-	#g.remove
+	#grass.run_command("g.remove",
+	#			flags="f",
+	#			type="vector",
+	#			name="fidimo_net1,fidimo_net2,fidimo_net3")
 
 
 
@@ -762,7 +800,8 @@ def fidimo_kernel_cdf(x,sigma_stat,sigma_mob,p):
 
 def fidimo_source_pop(	input,
 						source_col,
-						fidimo_db_path):
+						fidimo_db_path,
+						realisation):
 	'''This function appends source populations to distance matrix and creates output map'''
 	
 	# connect to database
@@ -821,7 +860,7 @@ def fidimo_source_pop(	input,
 	fidimo_db.execute('SELECT orig_Cat FROM fidimo_source_pop GROUP BY orig_cat HAVING COUNT(*) > 1;')
 	split_reach_cats = [x[0] for x in fidimo_db.fetchall()]
 	for i in split_reach_cats:
-		if realisation=True:
+		if realisation==True:
 			fidimo_db.execute('UPDATE fidimo_source_pop SET source_pop = round((source_pop/(SELECT SUM(edge_length) FROM fidimo_source_pop WHERE orig_cat=?))*edge_length,0)  WHERE orig_cat=?',(i,i))
 		else:
 			fidimo_db.execute('UPDATE fidimo_source_pop SET source_pop = (source_pop/(SELECT SUM(edge_length) FROM fidimo_source_pop WHERE orig_cat=?))*edge_length  WHERE orig_cat=?',(i,i))
@@ -998,110 +1037,140 @@ def fidimo_probability(	fidimo_db_path,
 	
 def fidimo_realisation(	realisation,
 						fidimo_db_path):
+	'''This function either weights the fidimo probabilities with the value of the value of
+	the source population or calculates realised fish count (real integer values) from the
+	probabilities using the multinomial distribution'''
 	
 	# connect to database
 	fidimo_database = sqlite3.connect(fidimo_db_path)
 	fidimo_db = fidimo_database.cursor()
 	
+	# First check if fidimo_result already exists in fidimo distance and create if not exist
+	fidimo_db.execute('SELECT * FROM fidimo_distance LIMIT 1')
+	if "fidimo_result" not in [x[0] for x in fidimo_db.description]:
+		fidimo_db.execute('''ALTER TABLE fidimo_distance ADD COLUMN fidimo_result DOUBLE''')
+		fidimo_db.execute('''ALTER TABLE fidimo_distance ADD COLUMN fidimo_result_lwr DOUBLE''')
+		fidimo_db.execute('''ALTER TABLE fidimo_distance ADD COLUMN fidimo_result_upr DOUBLE''')
+	
+	# Before any calculations set fidimo_result in fidimo_distance to ''
+	fidimo_db.execute('''UPDATE fidimo_distance SET fidimo_result=NULL,fidimo_result_lwr=NULL,fidimo_result_upr=NULL;''')
+	fidimo_database.commit()
+	
 	if realisation==True:
-			# Get number of runs for statistical intervals
-		if statistical_interval == "no":
-			nrun=[""]
-		else:
-			nrun=["","lwr","upr"]
+		print("Calculate realisation (i.e. fish counts that disperse from each source population)")
+		
+		# Get number of runs for statistical intervals
+		fidimo_db.execute('''SELECT SUM(basic_fidimo_prob) AS basic_fidimo_prob,
+									SUM(basic_fidimo_prob_lwr) AS basic_fidimo_prob_lwr, 
+									SUM(basic_fidimo_prob_upr) AS basic_fidimo_prob_upr 
+							FROM fidimo_distance''')
+		nrun = zip([x[0] for x in fidimo_db.description],[x!=None for x in fidimo_db.fetchall()[0]])
 		
 		# Realisation using the mutlinomial distribution to obtain indiviual counts
 		# Get ids of all source reaches that have source_pop>0
 		fidimo_db.execute('SELECT DISTINCT from_orig_v,source_pop FROM fidimo_distance WHERE source_pop>0')
 		source_populations = [[x[0],x[1]] for x in fidimo_db.fetchall()]
 		
+		# Insert results of realisation in temporary table and then update fidimo_distance from that table
+		fidimo_db.execute('''CREATE TEMP TABLE realisation_result_tmp 
+							(fidimo_distance_id INTEGER, fidimo_result DOUBLE, fidimo_result_lwr DOUBLE, fidimo_result_upr DOUBLE)''')
+		
 		for i in source_populations:
 			fidimo_db.execute('''SELECT * FROM fidimo_distance WHERE from_orig_v = ?''', (i[0],))
 			fidimo_distance_colnames = dict(zip([x[0] for x in fidimo_db.description], range(0,len(fidimo_db.description))))
 			fidimo_distance_array = scipy.array(fidimo_db.fetchall())
-
-			#if options['seed2']:
-			#	numpy.random.seed(int(optionss['seed2']))
-			
-			realised_fidimo_result = fidimo_distance_array[:,fidimo_distance_colnames["fidimo_distance_id"]]
-			
+			# Array to collect results
+			realised_fidimo_result = fidimo_distance_array[:,fidimo_distance_colnames["fidimo_distance_id"]].astype(int)
 			for j in nrun:
-				basic_fidimo_prob_i = numpy.nan_to_num(fidimo_distance_array[:,fidimo_distance_colnames["basic_fidimo_prob"+j]].astype(float))
-				realised_fidimo_result_i = numpy.random.multinomial(int(i[1]), 
-										(basic_fidimo_prob_i/numpy.sum(basic_fidimo_prob_i)), size=1)
-			
-			#### HERE CONTINUE ######
-			
-				realised_fidimo_result = numpy.column_stack((realised_fidimo_result.tolist(),
-					realised_fidimo_result_i.tolist() ))
-			
-			
-			# Insert results of realisation in temporary table and then update fidimo_distance from that table
-			mapset_db.execute('''CREATE TEMP TABLE realisation_result_tmp 
-							(fidimo_distance_id INTEGER, fidimo_result DOUBLE, fidimo_result_lwr DOUBLE, fidimo_result_upr DOUBLE)''')
+				if j[1]==False:
+					continue
+				basic_fidimo_prob = numpy.nan_to_num(fidimo_distance_array[:,fidimo_distance_colnames[j[0]]].astype(float))
 				
-			if statistical_interval == "no":
+				#if options['seed2']:
+					#numpy.random.seed(int(optionss['seed2']))
+				realised_fidimo_result_i = numpy.random.multinomial(int(i[1]), 
+										(basic_fidimo_prob/numpy.sum(basic_fidimo_prob)))
+			
+				realised_fidimo_result = numpy.column_stack((realised_fidimo_result,
+					realised_fidimo_result_i.astype(int)))
+				
+			if sum([x[1] for x in nrun]) == 1:
  				fidimo_db.executemany('''INSERT INTO realisation_result_tmp 
 						(fidimo_distance_id, fidimo_result) 
 						VALUES (?,?)''', map(tuple, realised_fidimo_result.tolist()))
- 			else:
+ 			elif sum([x[1] for x in nrun]) == 3:
  				fidimo_db.executemany('''INSERT INTO realisation_result_tmp 
 						(fidimo_distance_id, fidimo_result, fidimo_result_lwr, fidimo_result_upr) 
 						VALUES (?,?,?,?)''', map(tuple, realised_fidimo_result.tolist()))
+ 			else:
+ 				print("Realisation cannot be calculated due to some statistical intervals")
+ 				
+ 		## Join fidimo_prob with fidimo_distance
+		print("Update fidimo_distance with realised fidimo results (i.e. fish counts)")
+		fidimo_db.execute('''UPDATE fidimo_distance SET 
+								fidimo_result = (SELECT fidimo_result FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id),
+								fidimo_result_lwr = (SELECT fidimo_result_lwr FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id),
+								fidimo_result_upr = (SELECT fidimo_result_upr FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id)
+								 WHERE EXISTS (SELECT fidimo_distance_id FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id)''')
 			
 	else:
 		# Multiply by value of inital source population
+		print("Update fidimo_distance with source-population-weighted fidimo probability")
 		fidimo_db.execute('''UPDATE fidimo_distance SET
 									fidimo_result = basic_fidimo_prob*source_pop,
 									fidimo_result_lwr = basic_fidimo_prob_lwr*source_pop,
 									fidimo_result_upr = basic_fidimo_prob_upr*source_pop''')
-
-
+	# Commit changes
+	fidimo_database.commit()
+	
+	#Close database connection
+	fidimo_database.close()
+	
+		
+	
 def fidimo_summarize(	output,
 						fidimo_db_path):
-	'''This function summarizes the fidimo probabilities for each target reach
-	and corrects/multiplies by value of each source'''
+	'''This function summarizes the fidimo result for each target reach
+	and writes results back to output vector map'''
 	
 	# connect to database
 	fidimo_database = sqlite3.connect(fidimo_db_path)
 	fidimo_db = fidimo_database.cursor()
-	
-	#Create columns for fidimo probabilies that are accounted for value of initial source population
-	fidimo_db.execute('SELECT * FROM fidimo_distance LIMIT 1')
-	if "fidimo_prob" not in [x[0] for x in fidimo_db.description]:
-		fidimo_db.execute('''ALTER TABLE fidimo_distance ADD COLUMN fidimo_result DOUBLE''')
-		fidimo_db.execute('''ALTER TABLE fidimo_distance ADD COLUMN fidimo_result_lwr DOUBLE''')
-		fidimo_db.execute('''ALTER TABLE fidimo_distance ADD COLUMN fidimo_result_upr DOUBLE''')
-	
-
-	
-	
-	
+		
 	# First, delete summary_fidimo_prob if exists
-	fidimo_db.execute('''DROP TABLE IF EXISTS summary_fidimo_prob''')
+	fidimo_db.execute('''DROP TABLE IF EXISTS summary_fidimo_result''')
 	
 	#Summarize fidimo prob for each target reach
-	fidimo_db.execute('''CREATE TABLE summary_fidimo_prob AS SELECT
+	fidimo_db.execute('''CREATE TABLE summary_fidimo_result AS SELECT
 		to_orig_v, 
+		target_edge_length AS reach_length,
 		CAST(SUM(fidimo_result) AS DOUBLE) AS fidimo_result, 
 		CAST(SUM(fidimo_result_lwr) AS DOUBLE) AS fidimo_result_lwr,
 		CAST(SUM(fidimo_result_upr) AS DOUBLE) AS fidimo_result_upr 
 		FROM fidimo_distance GROUP BY to_orig_v;''')
 	
-
+	fidimo_db.execute('''ALTER TABLE summary_fidimo_result ADD COLUMN source_pop DOUBLE''')
+	fidimo_db.execute('''UPDATE summary_fidimo_result SET
+									source_pop = (SELECT source_pop FROM fidimo_source_pop WHERE cat=summary_fidimo_result.to_orig_v)''')
+	# Commit changes
+	fidimo_database.commit()
+	
+	fidimo_db.execute('''ALTER TABLE summary_fidimo_result ADD COLUMN rel_fidimo_result DOUBLE''')
+	fidimo_db.execute('''ALTER TABLE summary_fidimo_result ADD COLUMN rel_fidimo_result_lwr DOUBLE''')
+	fidimo_db.execute('''ALTER TABLE summary_fidimo_result ADD COLUMN rel_fidimo_result_upr DOUBLE''')
+	
+	fidimo_db.execute('''UPDATE summary_fidimo_result SET
+									rel_fidimo_result = fidimo_result/reach_length,
+									rel_fidimo_result_lwr = fidimo_result_lwr/reach_length,
+									rel_fidimo_result_upr = fidimo_result_upr/reach_length''')
+	
+	# Commit changes
+	fidimo_database.commit()
 	
 	#Close database connection
 	fidimo_database.close()
-
-def fidimo_mapping(	output
-						fidimo_db_path):	
-	# Import table with fidimo summary to GRASS DB
-	grass.run_command("db.in.ogr",
-		quiet=True,
-		input=fidimo_db_path,
-		db_table="summary_fidimo_prob",
-		output="summary_fidimo_prob")
 	
+	# Attach fidimo results to attribute table of output map
 	#database-connection of current mapset
 	mapset_db_settings = dict(x.split(": ") for x in grass.read_command("db.connect",
 			flags="p").splitlines())
@@ -1111,25 +1180,53 @@ def fidimo_mapping(	output
 	mapset_database = sqlite3.connect(mapset_db_settings["database"])
 	mapset_db = mapset_database.cursor()
 	
-	#Add columns to output map table
+	mapset_db.execute("ATTACH DATABASE ? AS fidimo_db", (fidimo_db_path,))
+	mapset_db.execute('''UPDATE fidimo_output SET 
+								reach_length = (SELECT summary_fidimo_result.reach_length FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+									WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat),
+								source_pop = (SELECT summary_fidimo_result.source_pop FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+									WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat),
+								fidimo_result = (SELECT summary_fidimo_result.fidimo_result FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+									WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat),	
+								fidimo_result_lwr = (SELECT summary_fidimo_result.fidimo_result_lwr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+									WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat),	
+								fidimo_result_upr = (SELECT summary_fidimo_result.fidimo_result_upr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+									WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat),
+								rel_fidimo_result = (SELECT summary_fidimo_result.rel_fidimo_result FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+									WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat),	
+								rel_fidimo_result_lwr = (SELECT summary_fidimo_result.rel_fidimo_result_lwr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+									WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat),	
+								rel_fidimo_result_upr = (SELECT summary_fidimo_result.rel_fidimo_result_upr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+									WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat);''')
+	# Commit changes
+	mapset_database.commit()
 	#Close database connection
-	fidimo_database.close()
+	mapset_database.close()
 
+
+def fidimo_mapping(output):
+	grass.run_command("v.db.addcolumn",
+		quiet=True,
+		map=output,
+		columns="rgb_column VARCHAR(11)")
 	
-	
-	#Update fidimo output map table
-	db.in.ogr input=/path/to/sqlite.db db_table=census_raleigh output=census_raleigh
+	grass.run_command("v.colors",
+		flags="g",
+		map=output,
+		use="attr",
+		column="rel_fidimo_result",
+		color="bgyr",
+		rgb_column="rgb_column")
+
+	grass.run_command("d.vect",
+		map=output,
+		type="point",
+		rgb_column="rgb_column",
+		width=1)
+
+
+
 	
 #def barrier_correction()
 
-###########
 
-fidimo_db.execute('''SELECT * FROM fidimo_distance 
-		WHERE source_strahler = ?
-			AND distance <= ? 
-			AND direction = ?
-			AND source_pop > 0''', (i,max_dist,direction_dict[j]))
-	
-	# Split all cases into chunks of max. chunk_size		
-	row_ids = [x[0] for x in fidimo_db.fetchall()]
-	
