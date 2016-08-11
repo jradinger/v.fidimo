@@ -25,14 +25,14 @@
 #% key: input
 #% type: string
 #% gisprompt: old,vector,vector
-#% description: River network (Vector output from v.stream.order)
+#% description: River network (e.g. vector output from v.stream.order)
 #% required: no
 #% guisection: Network parameters
 #%end
 #%option
 #% key: strahler_col
 #% type: string
-#% required: yes
+#% required: no
 #% multiple: no
 #% key_desc: name
 #% description: Column name indicating Strahler order of each stream segment
@@ -41,7 +41,7 @@
 #%option
 #% key: shreve_col
 #% type: string
-#% required: yes
+#% required: no
 #% multiple: no
 #% key_desc: name
 #% description: Column name indicating Shreve order of each stream segment
@@ -50,7 +50,7 @@
 #%option
 #% key: network_col
 #% type: string
-#% required: yes
+#% required: no
 #% multiple: no
 #% key_desc: name
 #% description: Column name indicating Network ID each stream segment belongs to
@@ -114,7 +114,6 @@
 #% description: Time interval for model step [days]
 #% guisection: Dispersal parameters
 #% options: 1-3285
-#% answer: 30
 #%end
 #%Option
 #% key: p
@@ -122,7 +121,6 @@
 #% required: no
 #% multiple: no
 #% description: Share of the stationary component (valid range 0 - 1)
-#% answer:0.67 
 #% guisection: Dispersal parameters
 #%end
 #%Option
@@ -1352,9 +1350,9 @@ def main():
 	threshold = options['threshold']
 	
 	source_col = options['source_col']
-	l=options['l']
-	ar=options['ar']
-	t=options['t']
+	l=int(options['l'])
+	ar=float(options['ar'])
+	t=int(options['t'])
 	statistical_interval=options['statistical_interval']
 	seed_fishmove=options['seed_fishmove']
 	
