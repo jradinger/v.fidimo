@@ -903,7 +903,7 @@ def fidimo_source_pop(	input,
 	# Copy source populations to FIDIMO DB ####
 	grass.run_command("db.copy",
 		overwrite=True,
-		from_table=input,
+		from_table=input.split("@")[0],
 		to_database=fidimo_db_path,
 		to_table="fidimo_source_pop_tmp")
 	
