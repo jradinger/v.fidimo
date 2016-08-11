@@ -1404,7 +1404,7 @@ def main():
 					fidimo_db_path=fidimo_db_path)
 	
 	# Map fidimo result to display
-	#fidimo_mapping(output)
+	fidimo_mapping(output)
 
 	return 0
 

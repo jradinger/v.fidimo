@@ -1,6 +1,7 @@
 # Install fidimo via g.extension
 g.extension extension=v.fidimo operation=add url=https://github.com/jradinger/v.fidimo
 
+v.fidimo --overwrite fidimo_db_path='/home/radinger/Documents/FIDIMO_DB/fidimo_sqlite.db' input=fidimo_testnetwork@fidimo_test strahler_col=strahler shreve_col=shreve network_col=network barriers=fidimo_testbarriers@fidimo_test passability_col=passability threshold=25 source_col=source_populations2 l=300 ar=1.25 t=30 seed_fishmove=999 output=testout
 
 ###########################################
 ######## Input settings for FIDIMO ########
