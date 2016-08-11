@@ -3,42 +3,52 @@
 
 
 ###########################################
-########## Run FIDIMO from input ##########
+######## Input settings for FIDIMO ########
 ###########################################
 
 # Stream settings
-barriers="fidimo_testbarriers"
-passability_col="passability"
 input="fidimo_testnetwork"
-threshold=25
+output="fidimo_output"
 strahler_col="strahler"
 shreve_col="shreve"
 network_col="network"
+
+# Barriers settings
+barriers="fidimo_testbarriers"
 passability_col="passability"
-source_col="source_populations"
-truncation=0.999
+threshold=25
+
+# Source Population settings
+source_col="source_populations2"
 
 # Dispersal settings
 l=200
 ar=1.25
-t=30
+t=180
 statistical_interval="no"
 
 #fidimo database connection
 fidimo_db_path='/home/radinger/Documents/FIDIMO_DB/fidimo_sqlite.db'
 
+###########################################
+########## Run FIDIMO from input ##########
+###########################################
+
+# Set up fidimo_db
+create_fidimo_db(fidimo_db_path=fidimo_db_path)
 
 # Create fidimo network from input data (river shape, barrier points)
 fidimo_network(input=input,
+				output=output,
 				strahler_col=strahler_col,
 				shreve_col=shreve_col,
 				network_col=network_col,
 				barriers=barriers,
+				fidimo_db_path = fidimo_db_path,
 				passability_col=passability_col,
 				threshold=threshold)
 
-
-# Set up fidimo_db and copying edges and vertices to fidimo_db
+# Copying edges and vertices etc to fidimo_db
 set_fidimo_db(fidimo_db_path=fidimo_db_path)
 					
 # Calculate distance between single river reaches
@@ -51,20 +61,26 @@ my_sigma_dict = sigma_calc(	l=l,
 							statistical_interval=statistical_interval,
 							fishmove_seed=999)
 
-# Append source populatoins
+# Append source populations
 fidimo_source_pop(input=input,
 				source_col=source_col,
-				output="fidimo_test_output",
-				fidimo_db_path=fidimo_db_path)
+				fidimo_db_path=fidimo_db_path,
+				realisation=True)
 
 # Calcuate fidimo probability
-fidimo_probability(input=input,
-				output="fidimo_test_output",
-				fidimo_db_path=fidimo_db_path,
+fidimo_probability(fidimo_db_path=fidimo_db_path,
 				sigma_dict=my_sigma_dict,
 				p=0.67,
 				statistical_interval=statistical_interval)
+				
+# Calculate realisation or multiplication by value of initial source population				
+fidimo_realisation(	realisation=True,
+					fidimo_db_path=fidimo_db_path)
 
+# Get sum of fidimo results for each target reach				
+fidimo_summarize(output=output,
+				fidimo_db_path=fidimo_db_path)
 
-
+# Map fidimo result to display
+fidimo_mapping(output)
 
