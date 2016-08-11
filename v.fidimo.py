@@ -116,6 +116,7 @@
 #% options: 1-3285
 #% answer: 30
 #%end
+#%Option
 #% key: p
 #% type: double
 #% required: no
@@ -1407,8 +1408,10 @@ def main():
 	# Map fidimo result to display
 	#fidimo_mapping(output)
 
+	return 0
 
 if __name__ == "__main__":
 	options, flags = grass.parser()
 	#atexit.register(cleanup)
 	sys.exit(main())
+	

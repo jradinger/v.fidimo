@@ -1,5 +1,5 @@
 # Install fidimo via g.extension
-
+g.extension extension=v.fidimo operation=add url=https://github.com/jradinger/v.fidimo
 
 
 ###########################################
