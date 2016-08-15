@@ -1484,7 +1484,7 @@ def print_metadata(fidimo_db_path):
 # def barrier_correction()
 
 
-def main():
+def main(): 
     '''	###########################################
         ########## Run FIDIMO from input ##########
         ###########################################'''
@@ -1498,31 +1498,31 @@ def main():
     fidimo_db_path = options['fidimo_db_path']
     passability_col = options['passability_col']
     threshold = options['threshold']
-
+    
     source_col = options['source_col']
-    l = int(options['l'])
-    ar = float(options['ar'])
-    t = int(options['t'])
+    l = options['l']
+    ar = options['ar']
+    t = options['t']
     statistical_interval = options['statistical_interval']
     seed_fishmove = options['seed_fishmove']
-
-
+    
+    
     ############ DEFINITION CLEANUP TEMPORARY FILES ##############
     # global variables for cleanup
     global tmp_map_vect
     tmp_map_vect = ['streams_tmp', 'barriers_tmp', 'fidimo_net1_tmp',
                     'fidimo_net2_tmp', 'fidimo_net3_tmp', 'output_tmp']
-
+                    
     ############ Start with FIDIMO modules ##############
     # Print out Metadata and exit main function
     if flags['m']:
-        print_metadata(fidimo_db_path=fidimo_db_path)
+        print_metadata(fidimo_db_path=options['fidimo_db_path'])
         return None
-
+        
     if not (flags['s'] or flags['f']):
         # Set up fidimo_db
         create_fidimo_db(fidimo_db_path=fidimo_db_path)
-
+        
         # Create fidimo network from input data (river shape, barrier points)
         fidimo_network(input=input,
                        output=output,
@@ -1533,25 +1533,25 @@ def main():
                        fidimo_db_path=fidimo_db_path,
                        passability_col=passability_col,
                        threshold=threshold)
-
+        
         # Copying edges and vertices etc to fidimo_db
         set_fidimo_db(fidimo_db_path=fidimo_db_path)
-
+        
         # Calculate distance between single river reaches
         fidimo_distance(fidimo_db_path=fidimo_db_path)
-
+        
     if not (flags['n'] or flags['f']):
         # Append source populations
         fidimo_source_pop(input=input,
                           source_col=source_col,
                           fidimo_db_path=fidimo_db_path,
                           realisation=True)
-
+        
     if not (flags['n'] or flags['s']):
         # Calculate dispersal distances
-        my_sigma_dict = sigma_calc(	l=l,
-                                    ar=ar,
-                                    t=t,
+        my_sigma_dict = sigma_calc(	l=int(l),
+                                    ar=float(ar),
+                                    t=int(t),
                                     statistical_interval=statistical_interval,
                                     seed_fishmove=seed_fishmove)
         # Calcuate fidimo probability
@@ -1559,16 +1559,16 @@ def main():
                            sigma_dict=my_sigma_dict,
                            p=0.67,
                            statistical_interval=statistical_interval)
-
+        
         # Calculate realisation or multiplication by value of initial source
         # population
         fidimo_realisation(	realisation=True,
                             fidimo_db_path=fidimo_db_path)
-
+        
         # Get sum of fidimo results for each target reach
         fidimo_summarize(output=output,
                          fidimo_db_path=fidimo_db_path)
-
+        
         # Map fidimo result to display
         fidimo_mapping(output)
 
