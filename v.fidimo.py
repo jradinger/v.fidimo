@@ -452,14 +452,14 @@ def fidimo_network( input,
 			layer=2,
 			column="v_type",
 			value=1,
-			where="cat IN (SELECT cat FROM barriers_tmp%s)"(str(os.getpid()),))
+			where="cat IN (SELECT cat FROM barriers_tmp%s)"%(str(os.getpid()),))
 		grass.run_command("v.db.update",
 			quiet=True,
 			map="fidimo_net3_tmp"+str(os.getpid()),
 			layer=2,
 			column="v_type",
 			value=2,
-			where="cat NOT IN (SELECT cat FROM barriers_tmp%s)"(str(os.getpid()),))
+			where="cat NOT IN (SELECT cat FROM barriers_tmp%s)"%(str(os.getpid()),))
 	else:
 		grass.run_command("v.db.update",
 			quiet=True,
