@@ -166,6 +166,7 @@
 
 import os
 import sys
+import atexit
 from grass.script import core as grass
 import math
 import sqlite3
