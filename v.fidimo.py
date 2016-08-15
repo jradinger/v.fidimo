@@ -151,11 +151,15 @@
 #% answer:no
 #%end
 #%Flag
-#% key: r
+#% key: u
 #% description: Values for source populations are provided in relative units (i.e. fish/probability per m)
 #%end
 #%Flag
-#% key: a
+#% key: r
+#% description: Calculate realisation of dispersal instead of probabilities
+#%end
+#%Flag
+#% key: k
 #% description: Keep all temporal maps
 #%end
 #%Flag
@@ -172,7 +176,7 @@
 #%end
 #%Flag
 #% key: m
-#% description: Print out metadata and exit
+#% description: Print out metadata only and exit
 #%end
 
 
@@ -225,7 +229,7 @@ tmp_map_vect = None
 
 
 def cleanup():
-    if tmp_map_vect and not flags['a']:
+    if tmp_map_vect and not flags['k']:
         grass.run_command("g.remove",
                           flags='f',
                           type='vector',
@@ -1015,7 +1019,7 @@ def fidimo_source_pop(	input,
 
     # If source populations are provided in relative units (e.g. CPUE, density per meter, probability per m)
     # then caculate first absolute values
-    # if flags['r']:
+    # if flags['u']:
     #	fidimo_db.execute('UPDATE fidimo_source_pop SET source_pop = source_pop*edge_length')
 
     # Correct for barrier splits
@@ -1545,7 +1549,7 @@ def main():
         fidimo_source_pop(input=input,
                           source_col=source_col,
                           fidimo_db_path=fidimo_db_path,
-                          realisation=True)
+                          realisation=flags['r'])
         
     if not (flags['n'] or flags['s']):
         # Calculate dispersal distances
@@ -1562,7 +1566,7 @@ def main():
         
         # Calculate realisation or multiplication by value of initial source
         # population
-        fidimo_realisation(	realisation=True,
+        fidimo_realisation(	realisation=flags['r'],
                             fidimo_db_path=fidimo_db_path)
         
         # Get sum of fidimo results for each target reach
