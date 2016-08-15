@@ -1378,7 +1378,7 @@ def main():
 	############ DEFINITION CLEANUP TEMPORARY FILES ##############
 	#global variables for cleanup
 	global tmp_map_vect
-	tmp_map_vect = ['streams_tmp', 'barriers_tmp', 'fidimo_net1_tmp','fidimo_net2_tmp','fidimo_net3_tmp']
+	tmp_map_vect = ['streams_tmp', 'barriers_tmp', 'fidimo_net1_tmp','fidimo_net2_tmp','fidimo_net3_tmp','output_tmp']
 
 	
 	# Set up fidimo_db
