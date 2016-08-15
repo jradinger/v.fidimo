@@ -154,6 +154,10 @@
 #% key: r
 #% description: Values for source populations are provided in relative units (i.e. fish/probability per m)
 #%end
+#%Flag
+#% key: a
+#% description: Keep all temporal maps
+#%end
 
 
 ###########################################
@@ -186,6 +190,23 @@ from scipy import stats
 from scipy import optimize
 
 FIDIMO_version = "0.0"
+
+###########################################
+############# Define Cleanup ##############
+###########################################
+
+
+tmp_map_vect = None
+
+def cleanup():
+	if tmp_map_vect and not flags['a']:
+		grass.run_command("g.remove",
+                flags = 'f',
+				type = 'vector',
+                name = [f + str(os.getpid()) for f in tmp_map_vect],
+				quiet = True)
+
+
 
 ###########################################
 ############# Set of Functions ############
@@ -295,16 +316,16 @@ def fidimo_network( input,
 	
 	# Input stream network      
 	streams_col_dict = {"strahler":strahler_col,"shreve":shreve_col,"network":network_col} #dictionary {'target_name':'input_name'}
-	import_vector(input_map=input, columns=streams_col_dict, output_map="streams_tmp")
+	import_vector(input_map=input, columns=streams_col_dict, output_map="streams_tmp"+str(os.getpid()))
 	
 	# Get original length of reaches
 	grass.run_command("v.db.addcolumn",
 		quiet=True,
-		map="streams_tmp",
+		map="streams_tmp"+str(os.getpid()),
 		columns="orig_length DOUBLE")
 	grass.run_command("v.to.db",
 		quiet=True,
-		map="streams_tmp",
+		map="streams_tmp"+str(os.getpid()),
 		columns="orig_length",
 		option="length",
 		units="meters")
@@ -315,17 +336,17 @@ def fidimo_network( input,
 		print("Connect barriers and nodes to network")
 		# Input barriers
 		passability_col_dict = {"passability":passability_col} #dictionary {'target_name':'input_name'}
-		import_vector(input_map=barriers, columns=passability_col_dict, output_map="barriers_tmp")
+		import_vector(input_map=barriers, columns=passability_col_dict, output_map="barriers_tmp"+str(os.getpid()))
 		
 		# Get network ID for each barrier
 		grass.run_command("v.db.addcolumn",
 			quiet=True,
-			map="barriers_tmp",
+			map="barriers_tmp"+str(os.getpid()),
 			columns="network INTEGER")
 		grass.run_command("v.what.vect",
-			map="barriers_tmp",
+			map="barriers_tmp"+str(os.getpid()),
 			column="network",
-			query_map="streams_tmp",
+			query_map="streams_tmp"+str(os.getpid()),
 			query_column="network",
 			dmax=threshold)
 		
@@ -333,16 +354,16 @@ def fidimo_network( input,
 		v.net(overwrite=True,
 			quiet=True,
 			flags="s",
-			input="streams_tmp",
-			points="barriers_tmp",
-			output="fidimo_net1",
+			input="streams_tmp"+str(os.getpid()),
+			points="barriers_tmp"+str(os.getpid()),
+			output="fidimo_net1_tmp"+str(os.getpid()),
 			operation="connect",
 			threshold=threshold)
 		v.net(overwrite=True,
 			quiet=True,
 			flags="c",
-			input="fidimo_net1",
-			output="fidimo_net2",
+			input="fidimo_net1_tmp"+str(os.getpid()),
+			output="fidimo_net2_tmp"+str(os.getpid()),
 			operation="nodes")
 	else:
 		#grass.message(_("Connect nodes to network"))
@@ -350,28 +371,28 @@ def fidimo_network( input,
 		v.net(overwrite=True,
 			quiet=True,
 			flags="c",
-			input="streams_tmp",
-			output="fidimo_net2",
+			input="streams_tmp"+str(os.getpid()),
+			output="fidimo_net2_tmp"+str(os.getpid()),
 			operation="nodes")
 		
 	# Get table with orig attributes for all (new split) network edges
 	v.category(overwrite=True,
 		quiet=True,
-		input="fidimo_net2",
+		input="fidimo_net2_tmp"+str(os.getpid()),
 		layer=3,
 		type="line",
-		output="fidimo_net3",
+		output="fidimo_net3_tmp"+str(os.getpid()),
 		option="add")
 	grass.run_command("v.db.addtable",
 		quiet=True,
-		map="fidimo_net3",
+		map="fidimo_net3_tmp"+str(os.getpid()),
 		table="edges",
 		layer=3,
 		column="orig_cat INTEGER, strahler INTEGER, shreve INTEGER, network INTEGER, orig_length DOUBLE, edge_length DOUBLE, from_orig_v INTEGER, to_orig_v INTEGER, from_orig_e INTEGER, to_orig_e INTEGER")
 	for i in ["orig_cat","strahler","shreve","network","orig_length"]:
 		grass.run_command("v.to.db",
 			quiet=True,
-			map="fidimo_net3",
+			map="fidimo_net3_tmp"+str(os.getpid()),
 			layer=3,
 			option="query",
 			columns=i,
@@ -381,7 +402,7 @@ def fidimo_network( input,
 	# Get lengths of (new split) network edges
 	grass.run_command("v.to.db",
 		quiet=True,
-		map="fidimo_net3",
+		map="fidimo_net3_tmp"+str(os.getpid()),
 		layer=3,
 		columns="edge_length",
 		option="length",
@@ -402,7 +423,7 @@ def fidimo_network( input,
 							(cat INTEGER, from_orig_v INTEGER, to_orig_v INTEGER)''')
 	e = [(int(x.split()[0]),int(x.split()[1]),int(x.split()[2])) for x in grass.read_command("v.net",
 		quiet=True,
-		input="fidimo_net3",
+		input="fidimo_net3_tmp"+str(os.getpid()),
 		operation="report",
 		arc_layer=3).splitlines()]
 	mapset_db.executemany("INSERT INTO edges_tmp (cat, from_orig_v, to_orig_v) VALUES (?,?,?)", e)
@@ -416,7 +437,7 @@ def fidimo_network( input,
 	# Add table for vertices in layer 2
 	grass.run_command("v.db.addtable",
 		quiet=True,
-		map="fidimo_net3",
+		map="fidimo_net3_tmp"+str(os.getpid()),
 		table="vertices",
 		layer=2,
 		column="v_type INTEGER, orig_cat INTEGER")
@@ -426,22 +447,22 @@ def fidimo_network( input,
 	if barriers:
 		grass.run_command("v.db.update",
 			quiet=True,
-			map="fidimo_net3",
+			map="fidimo_net3_tmp"+str(os.getpid()),
 			layer=2,
 			column="v_type",
 			value=1,
-			where="cat IN (SELECT cat FROM barriers_tmp)")
+			where="cat IN (SELECT cat FROM barriers_tmp%s)"(str(os.getpid()),))
 		grass.run_command("v.db.update",
 			quiet=True,
-			map="fidimo_net3",
+			map="fidimo_net3_tmp"+str(os.getpid()),
 			layer=2,
 			column="v_type",
 			value=2,
-			where="cat NOT IN (SELECT cat FROM barriers_tmp)")
+			where="cat NOT IN (SELECT cat FROM barriers_tmp%s)"(str(os.getpid()),))
 	else:
 		grass.run_command("v.db.update",
 			quiet=True,
-			map="fidimo_net3",
+			map="fidimo_net3_tmp"+str(os.getpid()),
 			layer=2,
 			column="v_type",
 			value=2)
@@ -449,7 +470,7 @@ def fidimo_network( input,
 	# Get barrier orig_cat
 	grass.run_command("v.db.update",
 		quiet=True,
-		map="fidimo_net3",
+		map="fidimo_net3_tmp"+str(os.getpid()),
 		layer=2,
 		column="orig_cat",
 		query_column="cat")
@@ -457,10 +478,10 @@ def fidimo_network( input,
 	# Update network id for each barrier
 	grass.run_command("v.db.join",
 			quiet=True,
-			map="fidimo_net3",
+			map="fidimo_net3_tmp"+str(os.getpid()),
 			layer=2,
 			column="orig_cat",
-			other_table="barriers_tmp",
+			other_table="barriers_tmp"+str(os.getpid()),
 			other_column="orig_cat",
 			subset_columns="network")
 	
@@ -470,13 +491,13 @@ def fidimo_network( input,
 		quiet=True,
 		overwrite=True,
 		flags="t",
-		input="fidimo_net3",
+		input="fidimo_net3_tmp"+str(os.getpid()),
 		layer=3,
-		output="output_tmp")
+		output="output_tmp"+str(os.getpid()))
 	grass.run_command("v.category",
 				quiet=True,
 				overwrite=True,
-				input="output_tmp",
+				input="output_tmp"+str(os.getpid()),
 				layer="3,1",
 				output=output,
 				option="chlayer")
@@ -526,7 +547,7 @@ def fidimo_network( input,
 	fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Network name"''',(input,))
 	fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Last modified"''',(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
 	
-	n_barriers = int(grass.read_command("v.info", flags="t", map="fidimo_net1").splitlines()[1].split("=")[1])  
+	n_barriers = int(grass.read_command("v.info", flags="t", map="fidimo_net1_tmp"+str(os.getpid())).splitlines()[1].split("=")[1])  
 	fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Barriers n"''',(n_barriers,))
 	
 	fidimo_database.commit()
@@ -1320,10 +1341,8 @@ def fidimo_mapping(output):
 		column="rel_fidimo_result",
 		color="bgyr")
 	
-	grass.run_command("d.vect",
-		map=output,
-		type="line",
-		width=1)
+	#grass.run_command("d.vect",
+	#	map=output)
 
 
 
@@ -1355,6 +1374,12 @@ def main():
 	t=int(options['t'])
 	statistical_interval=options['statistical_interval']
 	seed_fishmove=options['seed_fishmove']
+	
+	############ DEFINITION CLEANUP TEMPORARY FILES ##############
+	#global variables for cleanup
+	global tmp_map_vect
+	tmp_map_vect = ['streams_tmp', 'barriers_tmp', 'fidimo_net1_tmp','fidimo_net2_tmp','fidimo_net3_tmp']
+
 	
 	# Set up fidimo_db
 	create_fidimo_db(fidimo_db_path=fidimo_db_path)
@@ -1410,6 +1435,6 @@ def main():
 
 if __name__ == "__main__":
 	options, flags = grass.parser()
-	#atexit.register(cleanup)
+	atexit.register(cleanup)
 	sys.exit(main())
 
