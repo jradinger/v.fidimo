@@ -158,6 +158,22 @@
 #% key: a
 #% description: Keep all temporal maps
 #%end
+#%Flag
+#% key: n
+#% description: Only generate network (incl. barriers) and set up FIDIMO database. Don't calculate dispersal.
+#%end
+#%Flag
+#% key: s
+#% description: Only update source populations. Network must have been generated before. Dispersal is not calculated.
+#%end
+#%Flag
+#% key: f
+#% description: Only calculate dispersal based on previosely generated network and previousely defined source populations.
+#%end
+#%Flag
+#% key: m
+#% description: Print out metadata and exit
+#%end
 
 
 ###########################################
@@ -205,7 +221,7 @@ def cleanup():
                 flags = 'f',
 				type = 'vector',
                 name = [f + str(os.getpid()) for f in tmp_map_vect],
-				quiet = True)
+				quiet = quiet)
 
 
 
@@ -223,7 +239,7 @@ def import_vector(  input_map, #input vector name
 	
 	grass.run_command("g.copy", 
 		overwrite=True,
-		quiet=True,
+		quiet=quiet,
 		vector="%s,%s" %(input_map,output_map))
 	old_columns = grass.read_command("db.columns",
 		table=output_map).splitlines()
@@ -236,23 +252,23 @@ def import_vector(  input_map, #input vector name
 		pass
 	else:
 		grass.run_command("v.db.dropcolumn",
-			quiet=True,
+			quiet=quiet,
 			map=output_map,
 			columns=[x for x in old_columns if x not in columns.values()+["cat"]])
 			
 	for i in columns:
 		if columns[i]!=i:
 			grass.run_command("v.db.renamecolumn",
-				quiet=True,
+				quiet=quiet,
 				map=output_map,
 				column=",".join([columns[i],i]))
 	
 	grass.run_command("v.db.addcolumn",
-		quiet=True,
+		quiet=quiet,
 		map=output_map,
 		columns="orig_cat INTEGER")
 	grass.run_command("v.db.update",
-			quiet=True,
+			quiet=quiet,
 			map=output_map,
 			column="orig_cat",
 			query_column="cat")
@@ -261,6 +277,9 @@ def import_vector(  input_map, #input vector name
 
 def create_fidimo_db(fidimo_db_path):
 	''' Create FIDIMO DB'''
+	
+	## HERE a check if db already exists and launch an error if so and if overwrite flag is not set
+	########
 	
 	# If database exists it will be first removed
 	try:
@@ -321,11 +340,11 @@ def fidimo_network( input,
 	
 	# Get original length of reaches
 	grass.run_command("v.db.addcolumn",
-		quiet=True,
+		quiet=quiet,
 		map="streams_tmp"+str(os.getpid()),
 		columns="orig_length DOUBLE")
 	grass.run_command("v.to.db",
-		quiet=True,
+		quiet=quiet,
 		map="streams_tmp"+str(os.getpid()),
 		columns="orig_length",
 		option="length",
@@ -341,7 +360,7 @@ def fidimo_network( input,
 		
 		# Get network ID for each barrier
 		grass.run_command("v.db.addcolumn",
-			quiet=True,
+			quiet=quiet,
 			map="barriers_tmp"+str(os.getpid()),
 			columns="network INTEGER")
 		grass.run_command("v.what.vect",
@@ -353,7 +372,7 @@ def fidimo_network( input,
 		
 		# Create network
 		v.net(overwrite=True,
-			quiet=True,
+			quiet=quiet,
 			flags="s",
 			input="streams_tmp"+str(os.getpid()),
 			points="barriers_tmp"+str(os.getpid()),
@@ -361,7 +380,7 @@ def fidimo_network( input,
 			operation="connect",
 			threshold=threshold)
 		v.net(overwrite=True,
-			quiet=True,
+			quiet=quiet,
 			flags="c",
 			input="fidimo_net1_tmp"+str(os.getpid()),
 			output="fidimo_net2_tmp"+str(os.getpid()),
@@ -370,7 +389,7 @@ def fidimo_network( input,
 		#grass.message(_("Connect nodes to network"))
 		print("Connect nodes to network")
 		v.net(overwrite=True,
-			quiet=True,
+			quiet=quiet,
 			flags="c",
 			input="streams_tmp"+str(os.getpid()),
 			output="fidimo_net2_tmp"+str(os.getpid()),
@@ -378,21 +397,21 @@ def fidimo_network( input,
 		
 	# Get table with orig attributes for all (new split) network edges
 	v.category(overwrite=True,
-		quiet=True,
+		quiet=quiet,
 		input="fidimo_net2_tmp"+str(os.getpid()),
 		layer=3,
 		type="line",
 		output="fidimo_net3_tmp"+str(os.getpid()),
 		option="add")
 	grass.run_command("v.db.addtable",
-		quiet=True,
+		quiet=quiet,
 		map="fidimo_net3_tmp"+str(os.getpid()),
 		table="edges",
 		layer=3,
 		column="orig_cat INTEGER, strahler INTEGER, shreve INTEGER, network INTEGER, orig_length DOUBLE, edge_length DOUBLE, from_orig_v INTEGER, to_orig_v INTEGER, from_orig_e INTEGER, to_orig_e INTEGER")
 	for i in ["orig_cat","strahler","shreve","network","orig_length"]:
 		grass.run_command("v.to.db",
-			quiet=True,
+			quiet=quiet,
 			map="fidimo_net3_tmp"+str(os.getpid()),
 			layer=3,
 			option="query",
@@ -402,7 +421,7 @@ def fidimo_network( input,
 	
 	# Get lengths of (new split) network edges
 	grass.run_command("v.to.db",
-		quiet=True,
+		quiet=quiet,
 		map="fidimo_net3_tmp"+str(os.getpid()),
 		layer=3,
 		columns="edge_length",
@@ -423,7 +442,7 @@ def fidimo_network( input,
 	mapset_db.execute('''CREATE TEMP TABLE edges_tmp 
 							(cat INTEGER, from_orig_v INTEGER, to_orig_v INTEGER)''')
 	e = [(int(x.split()[0]),int(x.split()[1]),int(x.split()[2])) for x in grass.read_command("v.net",
-		quiet=True,
+		quiet=quiet,
 		input="fidimo_net3_tmp"+str(os.getpid()),
 		operation="report",
 		arc_layer=3).splitlines()]
@@ -437,7 +456,7 @@ def fidimo_network( input,
 	
 	# Add table for vertices in layer 2
 	grass.run_command("v.db.addtable",
-		quiet=True,
+		quiet=quiet,
 		map="fidimo_net3_tmp"+str(os.getpid()),
 		table="vertices",
 		layer=2,
@@ -447,14 +466,14 @@ def fidimo_network( input,
 	# Create and populate column to distinguish between barrier / node
 	if barriers:
 		grass.run_command("v.db.update",
-			quiet=True,
+			quiet=quiet,
 			map="fidimo_net3_tmp"+str(os.getpid()),
 			layer=2,
 			column="v_type",
 			value=1,
 			where="cat IN (SELECT cat FROM barriers_tmp%s)"%(str(os.getpid()),))
 		grass.run_command("v.db.update",
-			quiet=True,
+			quiet=quiet,
 			map="fidimo_net3_tmp"+str(os.getpid()),
 			layer=2,
 			column="v_type",
@@ -462,7 +481,7 @@ def fidimo_network( input,
 			where="cat NOT IN (SELECT cat FROM barriers_tmp%s)"%(str(os.getpid()),))
 	else:
 		grass.run_command("v.db.update",
-			quiet=True,
+			quiet=quiet,
 			map="fidimo_net3_tmp"+str(os.getpid()),
 			layer=2,
 			column="v_type",
@@ -470,7 +489,7 @@ def fidimo_network( input,
 		
 	# Get barrier orig_cat
 	grass.run_command("v.db.update",
-		quiet=True,
+		quiet=quiet,
 		map="fidimo_net3_tmp"+str(os.getpid()),
 		layer=2,
 		column="orig_cat",
@@ -478,7 +497,7 @@ def fidimo_network( input,
 		
 	# Update network id for each barrier
 	grass.run_command("v.db.join",
-			quiet=True,
+			quiet=quiet,
 			map="fidimo_net3_tmp"+str(os.getpid()),
 			layer=2,
 			column="orig_cat",
@@ -486,17 +505,16 @@ def fidimo_network( input,
 			other_column="orig_cat",
 			subset_columns="network")
 	
-	# Copy final network to output map and clean associated tables
-	###### CHECK IF OUTPUT EXISTS AND HANDLING OF OVERWRITE FLAGE #####
+	# Copy final network to output map and adapt associated tables
 	grass.run_command("v.extract",
-		quiet=True,
-		overwrite=True,
+		quiet=quiet,
+		overwrite=overwrite,
 		flags="t",
 		input="fidimo_net3_tmp"+str(os.getpid()),
 		layer=3,
 		output="output_tmp"+str(os.getpid()))
 	grass.run_command("v.category",
-				quiet=True,
+				quiet=quiet,
 				overwrite=True,
 				input="output_tmp"+str(os.getpid()),
 				layer="3,1",
@@ -507,18 +525,18 @@ def fidimo_network( input,
 	tables_list = grass.read_command("db.tables", flags="p").splitlines()
 	if "fidimo_output" in tables_list:
 		grass.run_command("db.droptable",
-						quiet=True,
+						quiet=quiet,
 						flags="f",
 						table="fidimo_output")
 	
 	grass.run_command("db.copy",
-		quiet=True,
+		quiet=quiet,
 		overwrite=True,
 		from_table="edges",
 		to_table="fidimo_output")
 	
 	grass.run_command("v.db.connect",
-				quiet=True,
+				quiet=quiet,
 				overwrite=True,
 				map=output,
 				layer=1,
@@ -527,12 +545,12 @@ def fidimo_network( input,
 	output_columns = grass.read_command("db.columns",
 		table="fidimo_output").splitlines()
 	grass.run_command("v.db.dropcolumn",
-			quiet=True,
+			quiet=quiet,
 			map=output,
 			layer=1,
 			columns=[x for x in output_columns if x not in ["cat","orig_cat"]])
 	grass.run_command("v.db.addcolumn",
-		quiet=True,
+		quiet=quiet,
 		map=output,
 		layer=1,
 		columns='''reach_length DOUBLE, source_pop DOUBLE, fidimo_result DOUBLE, fidimo_result_lwr DOUBLE, 
@@ -554,12 +572,6 @@ def fidimo_network( input,
 	fidimo_database.commit()
 	fidimo_database.close()
 	
-	#removing networks and left over maps
-	#grass.run_command("g.remove",
-	#			flags="f",
-	#			type="vector",
-	#			name="fidimo_net1,fidimo_net2,fidimo_net3")
-
 
 
 def set_fidimo_db(fidimo_db_path):
@@ -1346,6 +1358,19 @@ def fidimo_mapping(output):
 	#	map=output)
 
 
+def print_metadata(fidimo_db_path):
+	''' Print out metadata'''
+	
+	fidimo_database = sqlite3.connect(fidimo_db_path)
+	fidimo_db = fidimo_database.cursor()
+	
+	# Fetch meta data		
+	fidimo_db.execute('''SELECT * FROM meta''')
+	meta_out = "\n".join([(str(x[0])+": "+str(x[1])) for x in fidimo_db.fetchall()])
+	
+	fidimo_database.close()
+
+	print(meta_out)
 
 	
 #def barrier_correction()
@@ -1376,61 +1401,77 @@ def main():
 	statistical_interval=options['statistical_interval']
 	seed_fishmove=options['seed_fishmove']
 	
+	##### Set quite and overwrite
+	quiet = True
+	if grass.verbosity() > 2:
+		quiet = False
+	overwrite = grass.overwrite()
+	
+	
 	############ DEFINITION CLEANUP TEMPORARY FILES ##############
 	#global variables for cleanup
 	global tmp_map_vect
 	tmp_map_vect = ['streams_tmp', 'barriers_tmp', 'fidimo_net1_tmp','fidimo_net2_tmp','fidimo_net3_tmp','output_tmp']
 
+
+	############ Start with FIDIMO modules ##############
+	# Print out Metadata and exit main function
+	if flags['m']:
+		print_metadata(fidimo_db_path=fidimo_db_path)
+		return None
 	
-	# Set up fidimo_db
-	create_fidimo_db(fidimo_db_path=fidimo_db_path)
+	if not (flags['s'] or flags['f']):
+		# Set up fidimo_db
+		create_fidimo_db(fidimo_db_path=fidimo_db_path)
 	
-	# Create fidimo network from input data (river shape, barrier points)
-	fidimo_network(input=input,
-					output=output,
-					strahler_col=strahler_col,
-					shreve_col=shreve_col,
-					network_col=network_col,
-					barriers=barriers,
-					fidimo_db_path = fidimo_db_path,
-					passability_col=passability_col,
-					threshold=threshold)
+		# Create fidimo network from input data (river shape, barrier points)
+		fidimo_network(input=input,
+						output=output,
+						strahler_col=strahler_col,
+						shreve_col=shreve_col,
+						network_col=network_col,
+						barriers=barriers,
+						fidimo_db_path = fidimo_db_path,
+						passability_col=passability_col,
+						threshold=threshold)
 	
-	# Copying edges and vertices etc to fidimo_db
-	set_fidimo_db(fidimo_db_path=fidimo_db_path)
+		# Copying edges and vertices etc to fidimo_db
+		set_fidimo_db(fidimo_db_path=fidimo_db_path)
 						
-	# Calculate distance between single river reaches
-	fidimo_distance(fidimo_db_path = fidimo_db_path)
+		# Calculate distance between single river reaches
+		fidimo_distance(fidimo_db_path = fidimo_db_path)
 	
+	
+	if not (flags['n'] or flags['f']):
+		# Append source populations
+		fidimo_source_pop(input=input,
+						source_col=source_col,
+						fidimo_db_path=fidimo_db_path,
+						realisation=True)
+	
+	if not (flags['n'] or flags['s']):
 	# Calculate dispersal distances
-	my_sigma_dict = sigma_calc(	l=l,
-								ar=ar,
-								t=t,
-								statistical_interval=statistical_interval,
-								seed_fishmove=seed_fishmove)
-	
-	# Append source populations
-	fidimo_source_pop(input=input,
-					source_col=source_col,
-					fidimo_db_path=fidimo_db_path,
-					realisation=True)
-	
-	# Calcuate fidimo probability
-	fidimo_probability(fidimo_db_path=fidimo_db_path,
-					sigma_dict=my_sigma_dict,
-					p=0.67,
-					statistical_interval=statistical_interval)
-					
-	# Calculate realisation or multiplication by value of initial source population				
-	fidimo_realisation(	realisation=True,
+		my_sigma_dict = sigma_calc(	l=l,
+									ar=ar,
+									t=t,
+									statistical_interval=statistical_interval,
+									seed_fishmove=seed_fishmove)
+		# Calcuate fidimo probability
+		fidimo_probability(fidimo_db_path=fidimo_db_path,
+						sigma_dict=my_sigma_dict,
+						p=0.67,
+						statistical_interval=statistical_interval)
+						
+		# Calculate realisation or multiplication by value of initial source population				
+		fidimo_realisation(	realisation=True,
+							fidimo_db_path=fidimo_db_path)
+		
+		# Get sum of fidimo results for each target reach				
+		fidimo_summarize(output=output,
 						fidimo_db_path=fidimo_db_path)
 	
-	# Get sum of fidimo results for each target reach				
-	fidimo_summarize(output=output,
-					fidimo_db_path=fidimo_db_path)
-	
-	# Map fidimo result to display
-	fidimo_mapping(output)
+		# Map fidimo result to display
+		fidimo_mapping(output)
 
 	return 0
 
