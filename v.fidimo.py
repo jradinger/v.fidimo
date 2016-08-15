@@ -923,7 +923,7 @@ def sigma_calc(l,
             interval = "confidence"
 
         # Set fixed seed if specified
-        if fishmove_seed:
+        if seed_fishmove:
             seed = ",seed=" + str(seed_fishmove)
         else:
             seed = ""
