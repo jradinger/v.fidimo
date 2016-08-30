@@ -102,6 +102,7 @@
 #% description: Time interval for model step [days]
 #% guisection: Dispersal parameters
 #% options: 1-3285
+#% answer: 30
 #%end
 #%Option
 #% key: p
@@ -110,6 +111,7 @@
 #% multiple: no
 #% description: Share of the stationary component (valid range 0 - 1)
 #% guisection: Dispersal parameters
+#% answer: 0.67
 #%end
 #%Option
 #% key: seed_fishmove
