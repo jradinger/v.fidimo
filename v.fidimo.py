@@ -28,33 +28,24 @@
 #% description: River network (e.g. vector output from v.stream.order)
 #% required: no
 #% guisection: Network parameters
-#% guidependency: strahler_col,shreve_col,network_cols
+#% guidependency: strahler_col,shreve_col,network_col
 #%end
-#%option
+#%option G_OPT_DB_COLUMN
 #% key: strahler_col
-#% type: string
-#% required: no
-#% multiple: no
-#% key_desc: name
 #% description: Column name indicating Strahler order of each stream segment
+#% required: no
 #% guisection: Network parameters
 #%end
-#%option
+#%option G_OPT_DB_COLUMN
 #% key: shreve_col
-#% type: string
-#% required: no
-#% multiple: no
-#% key_desc: name
 #% description: Column name indicating Shreve order of each stream segment
+#% required: no
 #% guisection: Network parameters
 #%end
-#%option
+#%option G_OPT_DB_COLUMN
 #% key: network_col
-#% type: string
-#% required: no
-#% multiple: no
-#% key_desc: name
 #% description: Column name indicating Network ID each stream segment belongs to
+#% required: no
 #% guisection: Network parameters
 #%end
 #%option
