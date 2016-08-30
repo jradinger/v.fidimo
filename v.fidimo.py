@@ -28,7 +28,7 @@
 #% description: River network (e.g. vector output from v.stream.order)
 #% required: no
 #% guisection: Network parameters
-#% guidependency: strahler_col,shreve_col,network_col
+#% guidependency: strahler_col,shreve_col,network_col,source_col
 #%end
 #%option G_OPT_DB_COLUMN
 #% key: strahler_col
@@ -55,14 +55,12 @@
 #% description: Barrier point file (vector map)
 #% required: no
 #% guisection: Barrier parameters
+#% guidependency: passability_col
 #%end
-#%option
+#%option G_OPT_DB_COLUMN
 #% key: passability_col
-#% type: string
-#% required: no
-#% multiple: no
-#% key_desc: name
 #% description: Column name indicating passability rate (0-1) of each barrier
+#% required: no
 #% guisection: Barrier parameters
 #%end
 #%option
@@ -71,15 +69,13 @@
 #% key_desc: distance
 #% description: Snapping distance threshold of barriers (in m)
 #% required: no
+#% answer: 25
 #% guisection: Barrier parameters
 #%end
-#%option
+#%option G_OPT_DB_COLUMN
 #% key: source_col
-#% type: string
-#% required: no
-#% multiple: no
-#% key_desc: name
 #% description: Column name indicating source populations
+#% required: no
 #% guisection: Dispersal parameters
 #%end
 #%Option
