@@ -6,9 +6,9 @@
 #
 # AUTHOR(S):    Johannes Radinger
 #
-# VERSION:      V0.1 Beta
+# VERSION:      V0.0 Beta
 #
-# DATE:         2016-08-01
+# DATE:         2016-08-30
 #
 #############################################################################
 #%Module
@@ -28,6 +28,7 @@
 #% description: River network (e.g. vector output from v.stream.order)
 #% required: no
 #% guisection: Network parameters
+#% guidependency: strahler_col,shreve_col,network_cols
 #%end
 #%option
 #% key: strahler_col
@@ -177,6 +178,9 @@
 #%Flag
 #% key: m
 #% description: Print out metadata only and exit
+#%end
+#%rules
+#% requires_all: barriers,passability_col,threshold
 #%end
 
 
@@ -1470,7 +1474,8 @@ def fidimo_mapping(output):
 
 
 def print_metadata(fidimo_db_path):
-    ''' Print out metadata'''
+    ''' Print out metadata of FIDIMO database defined
+    in fidimo_db_path'''
 
     fidimo_database = sqlite3.connect(fidimo_db_path)
     fidimo_db = fidimo_database.cursor()
@@ -1489,10 +1494,8 @@ def print_metadata(fidimo_db_path):
 
 
 def main(): 
-    '''	###########################################
-        ########## Run FIDIMO from input ##########
-        ###########################################'''
-
+    ########## Run FIDIMO from input ##########
+    
     input = options['input']
     output = options['output']
     strahler_col = options['strahler_col']
