@@ -1,15 +1,114 @@
+
+
+<!--
+fidimo_logo
+-->
+<left>
+<img src="Fidimo_logo_color.png" alt="FIDIMO logo"  height="100px">
+<p>
+</left>
+
 <h2>DESCRIPTION</h2>
 
-The module <i>v.fidimo </i> 
+<em>v.fidimo</em> calculates fish dispersal in a river network from source populations with species specific dispersal parameters.
 
-<h2>Examples</h2>
+<h2>NOTES</h2>
+
+<em>v.fidimo</em> is a kernel-based (probabilistic) dispersal model
+for fish in vector river networks. The model calculates dispersal probabilities for each
+segment/reach of a user-defined stream network starting from predefined source populations
+based on species-specific dispersal parameters and under consideration of barriers to
+movement.
+
+<h2>OPTIONS</h2>
+
+
+Setting the -r flag calculates a realisation of fish dispersal. Hence, dispersal probabilities are transformed into fish counts by allocating the number of fish of the initial source populations to the target reaches. Accordingly, the output represents the number of fish that will disperse to a target reach in a given time frame and under consideration of the dispersal parameters. As the realisation builds on drawing samples from a multinomial distribution, the output will vary for each model run. To obtain reproducable results set the XXX-flag.
+
+<h2>EXAMPLES</h2>
+
+<h3>Generate example stream networks</h3>
+Examples based on subsets of the GRASS 7 North Carolina sample dataset (XXX),
+specficially the streams@PERMANENT map. The generation of the example networks
+requires the v.stream.order add-on which can be downloaded from here: XXX
+
+<div class="code"><pre>
+# Create outflow points to extract example networks
+cat > points.csv << EOF
+642228.347134|214979.370612
+643006.172641|214976.675997
+EOF
+v.in.ascii --overwrite output=stream_outflow input=points.csv x=1 y=2
+
+# Calculate stream order
+v.stream.order --overwrite input=streams@PERMANENT points=stream_outflow output=fidimo_testnetwork
+
+# Create barriers along the river network
+cat > barriers.csv << EOF
+642658.572872|216657.870334
+643015.853113|216613.563813
+643025.73136|217930.699074
+642334.713831|215728.242453
+EOF
+v.in.ascii --overwrite output=fidimo_testbarriers input=barriers.csv x=1 y=2
+v.db.addtable map=fidimo_testbarriers
+
+# Add passability to barriers
+v.db.addcolumn map=fidimo_testbarriers columns="passability DOUBLE"
+v.db.update map=fidimo_testbarriers column=passability value=0.5
+
+# Define reaches inhabitated by source populations (with probability and with real fish counts)
+v.db.addcolumn map=fidimo_testnetwork columns="source_populations DOUBLE"
+v.db.update map=fidimo_testnetwork column=source_populations value=1 where="cat IN (952,953,682,706,633,727,1010,642,587)"
+v.db.addcolumn map=fidimo_testnetwork columns="source_populations2 DOUBLE"
+v.db.update map=fidimo_testnetwork column=source_populations2 value=5000 where="cat IN (952,953,682,706,633,727,1010,642,587)"
+</pre></div>
+
+<h3>Install fidimo via g.extension</h3>
+
+<div class="code"><pre>
+g.extension extension=v.fidimo operation=add url=https://github.com/jradinger/v.fidimo
+</pre></div>
+
+<h3>Calculate fish dispersal</h3>
+
+Calculating fish dispersal for a 300 mm-sized fish with an aspect ratio of the caudal fin of 1.25
+and for 30 days.
+<div class="code"><pre>
+v.fidimo fidimo_db_path='.../fidimo_sqlite.db' input=fidimo_testnetwork@fidimo_test strahler_col=strahler shreve_col=shreve network_col=network source_col=source_populations2 l=300 ar=1.25 t=30 output=testout
+</pre></div>
+
+Setting the -r flag to calculate realised fish dispersal, i.e. the number of fish that will disperse to a target reach.
+<div class="code"><pre>
+v.fidimo --overwrite fidimo_db_path='.../fidimo_sqlite.db' input=fidimo_testnetwork@fidimo_test strahler_col=strahler shreve_col=shreve network_col=network source_col=source_populations2 l=300 ar=1.25 t=30 seed_fishmove=999 output=testout -r
+</pre></div>
+
+Calculating confidence intervals of dispersal probabilities.
+<div class="code"><pre>
+v.fidimo --overwrite fidimo_db_path='.../fidimo_sqlite.db' input=fidimo_testnetwork@fidimo_test strahler_col=strahler shreve_col=shreve network_col=network source_col=source_populations2 l=300 ar=1.25 t=30 seed_fishmove=999 output=testout_conf statistical_interval='confidence'
+</pre></div>
+
+Calculating realised fish dispersal (r-flag) under consideration of the confidence intervals.
+<div class="code"><pre>
+v.fidimo --overwrite fidimo_db_path='.../fidimo_sqlite.db' input=fidimo_testnetwork@fidimo_test strahler_col=strahler shreve_col=shreve network_col=network source_col=source_populations2 l=300 ar=1.25 t=30 seed_fishmove=999 output=testout_conf statistical_interval='confidence' -r
+</pre></div>
+
+Obtaining metadata of the FIDIMO database.
+<div class="code"><pre>
+v.fidimo -m fidimo_db_path='.../fidimo_sqlite.db'
+</pre></div>
+
+
 
 
 <h2>SEE ALSO</h2>
 
-<h2>REFERENCES</h2>
+<em>
+<a href="r.fidimo.html">r.fidimo</a>,
+</em>
 
 <h2>AUTHOR</h2>
+
 Johannes Radinger
 
-
+<p><i>Last changed: $Date: 2016-08-31 15:38:13$</i>

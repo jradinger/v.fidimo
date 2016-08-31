@@ -1,9 +1,9 @@
 #1/bin/bash
 # This script creates the river networks suitable for FIDIMO
 # for different stream networks in the "streams@PERMANENT"
-# vector map layer in the nc location
+# vector map layer in the North Carolina location
 
-# Create outflow points to indentify specific network
+# Create outflow points to extract example networks
 cat > points.csv << EOF
 642228.347134|214979.370612
 643006.172641|214976.675997
