@@ -1,0 +1,112 @@
+
+# In NC GRASS70 projection
+
+# Create outflow points
+cat > outflow.csv << EOF
+642228.347134|214979.370612
+EOF
+v.in.ascii --o output=stream_outflow input=outflow.csv x=1 y=2
+# run stream.order
+v.stream.order --overwrite input=streams@PERMANENT points=stream_outflow output=streams_fidimo
+
+
+
+#v.in.ascii input=data/stream_network.txt output=stream_network \
+#    format=standard
+#v.in.ascii input=data/stream_network_outlets.txt output=stream_network_outlets \
+#    format=standard
+
+
+# Create barriers files
+cat > barriers.csv << EOF
+52|642663.532665|216668.795556|0
+2|643100.243842|216696.274012|0.5
+4|634778.743442|220480.362365|0
+31|642731.560598|217323.553706|1
+EOF
+
+v.in.ascii --o output=barriers input=barriers.csv x=2 y=3 \
+columns='orig_cat INT, x DOUBLE, y DOUBLE, passability DOUBLE'
+
+
+############### Here starts FIDIMO ############
+
+##########  Barriers GRASS network ##############
+### Snap barriers to network
+v.net -s --overwrite input=streams_fidimo points=barriers \
+output=fidimo_net1 operation=connect threshold=25
+
+########## Nodes GRASS network ##################
+v.net -c --overwrite input=fidimo_net1 \
+output=fidimo_net2 operation=nodes
+
+### Add table for vertices
+v.db.addtable map=fidimo_net2@fidimo_test layer=2 table=vertices columns="barrier INT"
+
+# Create and populate db column to distinguish between barrier / node
+v.db.update map=fidimo_net2@fidimo_test layer=2 column=barrier value=1 where="cat IN (SELECT cat FROM barriers)"
+v.db.update map=fidimo_net2@fidimo_test layer=2 column=barrier value=0 where="cat NOT IN (SELECT cat FROM barriers)"
+
+### Join table to get barrier orig_cat
+v.db.join map=fidimo_net2@fidimo_test layer=2 column=cat other_table=barriers other_column=cat subset_columns=orig_b_cat
+
+
+#### Create FIDIMO DB
+db.createdb driver=sqlite database=/home/radinger/Documents/FIDIMO_DB/fidimo_sqlite.db
+## Point to DB
+
+######### Edges GRASS network
+db.columns table=fidimo_net2
+v.db.dropcolumn map=fidimo_net2@fidimo_test columns=x,y
+
+db.execute sql="CREATE TABLE edges (cat)"
+
+v.db.droptable -f map=fidimo_net2@fidimo_test table=fidimo_net2
+v.db.addtable map=fidimo_net2 table=edges columns="from INT, to INT" layer=3
+v.db.addtable map=fidimo_net2@fidimo_test table=edges columns="from INT, to INT"
+
+########## List of vertices ###############
+v.db.select -c map=fidimo_net2@fidimo_test layer=2 columns=cat,orig_b_cat,barrier
+#Midpoints cats
+db.select -c sql="SELECT cat FROM fidimo_net2"
+
+
+########## SQLITE
+CREATE TABLE test(cat INT, part INT, from_ INT, to_ INT, r_cat INT);
+INSERT INTO test (cat, from_, to_, r_cat) VALUES (1, 37, 32, 512);
+INSERT INTO test (cat, from_, to_, r_cat) VALUES (2, 28, 44, 516);
+UPDATE test SET part=1;
+INSERT INTO test SELECT cat,2 AS part,from_,to_,r_cat FROM test;
+
+CREATE TABLE reach(cat INT, g_cat INT);
+INSERT INTO reach (cat, g_cat) VALUES (512,0);
+INSERT INTO reach (cat, g_cat) VALUES (516,1);
+
+UPDATE test SET to_ = (SELECT g_cat FROM reach WHERE test.r_cat = reach.cat AND part = 1) WHERE EXISTS (SELECT g_cat FROM reach WHERE test.r_cat = reach.cat AND part=1);
+
+UPDATE test SET from_ = (SELECT g_cat FROM reach WHERE test.r_cat = reach.cat AND part = 2) WHERE EXISTS (SELECT g_cat FROM reach WHERE test.r_cat = reach.cat AND part=2);
+
+
+
+######## List of edges ####################
+
+### Report
+v.net input=fidimo_net2@fidimo_test operation=report
+
+
+
+v.net -c --overwrite input=streams_fidimo \
+output=fidimo_net2 operation=nodes
+
+v.net -s --overwrite input=fidimo_net2 points=streams_fidimo@fidimo_test \
+output=fidimo_net1 operation=connect threshold=25 node_layer=2
+
+
+
+v.net input=fidimo_net2@fidimo_test operation=report
+
+v.net --quiet input=fidimo_net@fidimo_test points=barriers@fidimo_test operation=report
+
+v.category map=yourmap operation=add cat=1 step=1 layer=3
+v.db.addtable map=yourmap layer=3 table=tablename.
+v.db.connect to get nodes information 
