@@ -875,10 +875,15 @@ def fidimo_distance(fidimo_db_path):
         
         # Get cats of original vertices (from-to), Get cats of original edges (from-to)
         #grass.message(_("Updating original vertex categories to fidimo_distance"))
-        print("Updating original vertex categories and original river reach (edges) categories to fidimo_distance")
+        print("Updating original vertex categories to fidimo_distance")
         fidimo_db.execute('''UPDATE fidimo_distance SET 
                       from_orig_v = (SELECT orig_cat FROM vertices WHERE cat=fidimo_distance.source),
-                      to_orig_v = (SELECT orig_cat FROM vertices WHERE cat=fidimo_distance.target),
+                      to_orig_v = (SELECT orig_cat FROM vertices WHERE cat=fidimo_distance.target)
+                      WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
+        fidimo_database.commit()
+        
+        print("Updating original river reach (edges) categories to fidimo_distance")
+        fidimo_db.execute('''UPDATE fidimo_distance SET 
                       from_orig_e = (SELECT orig_cat FROM edges WHERE cat=fidimo_distance.from_orig_v),
                       to_orig_e = (SELECT orig_cat FROM edges WHERE cat=fidimo_distance.to_orig_v)
                       WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
@@ -915,7 +920,7 @@ def fidimo_distance(fidimo_db_path):
     
     # Update metadata
     print("Update Metadata")
-    #fidimo_db.execute('SELECT COUNT(DISTINCT source) FROM fidimo_distance')
+    fidimo_db.execute('SELECT COUNT(*) FROM vertices WHERE v_type==3')
     fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Total reaches n"''', (str(
         [x[0] for x in fidimo_db.fetchall()][0]),))
     fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Distance matrix created"''',
