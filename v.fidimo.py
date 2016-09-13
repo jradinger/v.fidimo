@@ -51,21 +51,20 @@
 #% required: no
 #% guisection: Network parameters
 #%end
-
 #%option
 #% key: barriers
 #% type: string
 #% gisprompt:old,vector,vector
 #% description: Barrier point file (vector map)
 #% required: no
-#% guisection: Barrier parameters
+#% guisection: Network parameters
 #% guidependency: passability_col
 #%end
 #%option G_OPT_DB_COLUMN
 #% key: passability_col
 #% description: Column name indicating passability rate (0-1) of each barrier
 #% required: no
-#% guisection: Barrier parameters
+#% guisection: Network parameters
 #%end
 #%option
 #% key: threshold
@@ -74,16 +73,17 @@
 #% description: Snapping distance threshold of barriers (in m)
 #% required: no
 #% answer: 25
-#% guisection: Barrier parameters
+#% guisection: Network parameters
 #%end
 
 #%option G_OPT_F_INPUT
-#% key: source_pop
+#% key: source_pop_csv
 #% description: csv-File (comma-separeted) indicating source populations (columns: reach_ID,source_col,p_col)
 #% required: no
-#% guisection: Dispersal parameters
+#% guisection: Source populations
 #%end
 #%option
+
 #% key: l
 #% type: integer
 #% required: no
@@ -1008,22 +1008,21 @@ def fidimo_kernel_cdf(x, sigma_stat, sigma_mob, p):
     return (p * stats.norm.cdf(x, loc=0, scale=sigma_stat) + (1 - p) * stats.norm.cdf(x, loc=0, scale=sigma_mob))
 
 
-def fidimo_source_pop(  input,
-                       source_pop_csv,
+def fidimo_source_pop( source_pop_csv,
                        fidimo_db_path,
                        realisation):
     '''This function appends source populations to distance matrix and creates output map'''
-
+    
     # connect to database
     fidimo_database = sqlite3.connect(fidimo_db_path)
     fidimo_db = fidimo_database.cursor()
-
+    
     # Delete fidimo_source_pop if exists
     fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_source_pop_tmp''')
     fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_source_pop''')
-
+    
     fidimo_db.execute("CREATE TABLE fidimo_source_pop_tmp (cat, source_pop, p);")
-
+    
     # Read CSV and check if three columns (reach cat, source_col, p)
     with open(source_pop_csv,'rb') as csv_file:
         source_pop_csv_read = csv.DictReader(csv_file,fieldnames=("cat", "source_pop", "p")) # comma is default delimiter,header is assumed 
@@ -1034,10 +1033,10 @@ def fidimo_source_pop(  input,
   
     fidimo_db.executemany("INSERT INTO fidimo_source_pop_tmp (cat, source_pop, p) VALUES (?, ?, ?);", source_pop_csv_read_to_db)
     fidimo_database.commit()
-
+    
     fidimo_db.execute(
         '''CREATE INDEX fidimo_source_pop_tmp_index ON fidimo_source_pop_tmp (cat)''')
-
+    
     # Check if source pop and p are within a valid range
     fidimo_db.execute('SELECT DISTINCT p FROM fidimo_source_pop_tmp')
     p_fidimo_source_pop_tmp = [x[0] for x in fidimo_db.fetchall()]
@@ -1049,7 +1048,7 @@ def fidimo_source_pop(  input,
     if min(source_pop_fidimo_source_pop_tmp)<0:
         raise ValueError(
             "Values for source populations must be positive integer or decimal numbers. NAs not allowed")
-
+        
     # check if cats of fidimo_source_pop_tmp == orig_cat of edges
     fidimo_db.execute('SELECT DISTINCT orig_cat FROM edges')
     orig_cat_edges = [x[0] for x in fidimo_db.fetchall()]
@@ -1062,29 +1061,29 @@ def fidimo_source_pop(  input,
     else:
         print(
             "IDs (categories, cat) of source populations match cats of vector input map that has been used for calculating fidimo distance matrix")
-
+        
     # Create source_pop table in FIDIMO DB
     fidimo_db.execute('''CREATE TABLE fidimo_source_pop AS SELECT
               cat AS cat, orig_cat AS orig_cat, edge_length AS edge_length
               FROM edges WHERE edges.part=1;''')
     fidimo_db.execute(
         '''ALTER TABLE fidimo_source_pop ADD COLUMN source_pop DOUBLE''')
-
+    
     # Update source populations from input
     fidimo_db.execute(
         'UPDATE fidimo_source_pop SET source_pop = (SELECT source_pop FROM fidimo_source_pop_tmp WHERE orig_cat=fidimo_source_pop_tmp.cat)')
     fidimo_database.commit()
-
+    
     # Delete temporary input table fidimo_source_pop_tmp and corresponding
     # index if exists
     fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_source_pop_tmp''')
     fidimo_db.execute('''DROP INDEX IF EXISTS fidimo_source_pop_tmp_index''')
-
+    
     # If source populations are provided in relative units (e.g. CPUE, density per meter, probability per m)
     # then caculate first absolute values
     # if flags['u']:
     # fidimo_db.execute('UPDATE fidimo_source_pop SET source_pop = source_pop*edge_length')
-
+    
     # Correct for barrier splits
     # Get edges/reaches that are split by barriers (e.g. with more than 2
     # entries for orig_cat)
@@ -1098,12 +1097,12 @@ def fidimo_source_pop(  input,
         else:
             fidimo_db.execute(
                 'UPDATE fidimo_source_pop SET source_pop = (source_pop/(SELECT SUM(edge_length) FROM fidimo_source_pop WHERE orig_cat=?))*edge_length  WHERE orig_cat=?', (i, i))
-
+            
     # Setting all reaches that are not defined as source populations to 0
     fidimo_db.execute(
         '''UPDATE fidimo_source_pop SET source_pop=0.0 WHERE source_pop IS NULL OR source_pop='';''')
     fidimo_database.commit()
-
+    
     # Join table fidimo_distance with fidimo_source_pop
     #grass.message(_("Updating source population in fidimo_distance"))
     print("Updating source population in fidimo_distance")
@@ -1113,10 +1112,10 @@ def fidimo_source_pop(  input,
     if "source_pop" not in [x[0] for x in fidimo_db.description]:
         fidimo_db.execute(
             '''ALTER TABLE fidimo_distance ADD COLUMN source_pop DOUBLE''')
-
+        
     fidimo_db.execute(
         '''UPDATE fidimo_distance SET source_pop = (SELECT source_pop FROM fidimo_source_pop WHERE cat=fidimo_distance.from_orig_v)''')
-
+    
     # Update metadata
     print("Update Metadata")
     fidimo_db.execute(
@@ -1127,7 +1126,7 @@ def fidimo_source_pop(  input,
                       (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
     fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Last modified"''',
                       (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
-
+    
     fidimo_database.commit()
     fidimo_database.close()
 
@@ -1569,7 +1568,7 @@ def main():
     passability_col = options['passability_col']
     threshold = options['threshold']
 
-    source_pop = options['source_pop']
+    source_pop_csv = options['source_pop_csv']
     l = options['l']
     ar = options['ar']
     t = options['t']
@@ -1611,8 +1610,7 @@ def main():
 
     if not (flags['n'] or flags['f']):
         # Append source populations
-        fidimo_source_pop(input=input,
-                          source_pop=source_pop,
+        fidimo_source_pop(source_pop_csv=source_pop_csv,
                           fidimo_db_path=fidimo_db_path,
                           realisation=flags['r'])
 
