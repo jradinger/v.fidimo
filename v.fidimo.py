@@ -1103,18 +1103,27 @@ def fidimo_source_pop( source_pop_csv,
         '''UPDATE fidimo_source_pop SET source_pop=0.0 WHERE source_pop IS NULL OR source_pop='';''')
     fidimo_database.commit()
     
-    # Join table fidimo_distance with fidimo_source_pop
-    #grass.message(_("Updating source population in fidimo_distance"))
-    print("Updating source population in fidimo_distance")
     # First check if source_pop already exists in fidimo distance and create
     # if not exist
     fidimo_db.execute('SELECT * FROM fidimo_distance LIMIT 1')
     if "source_pop" not in [x[0] for x in fidimo_db.description]:
         fidimo_db.execute(
             '''ALTER TABLE fidimo_distance ADD COLUMN source_pop DOUBLE''')
-        
-    fidimo_db.execute(
-        '''UPDATE fidimo_distance SET source_pop = (SELECT source_pop FROM fidimo_source_pop WHERE cat=fidimo_distance.from_orig_v)''')
+    
+    # Get number of rows of fidimo_distance and chunk it into pieces of 10E5
+    fidimo_db.execute('''SELECT max(rowid) FROM fidimo_distance''')
+    max_fidimo_distance_rowid = [x[0] for x in fidimo_db.fetchall()][0]
+    fidimo_distance_rowid_chunks = [[x+1,x + 10E5] for x in xrange(0, max_fidimo_distance_rowid, int(10E5))]   
+    
+    # Join table fidimo_distance with fidimo_source_pop
+    #grass.message(_("Updating source population in fidimo_distance"))
+    print("Updating source population in fidimo_distance")
+    for k in range(len(fidimo_distance_rowid_chunks)):
+        print("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))) 
+        fidimo_db.execute('''UPDATE fidimo_distance SET 
+                      source_pop = (SELECT source_pop FROM fidimo_source_pop WHERE cat=fidimo_distance.orig_v)
+                      WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
+        fidimo_database.commit()
     
     # Update metadata
     print("Update Metadata")
