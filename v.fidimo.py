@@ -1088,7 +1088,7 @@ def fidimo_source_pop( source_pop_csv,
     # Get edges/reaches that are split by barriers (e.g. with more than 2
     # entries for orig_cat)
     fidimo_db.execute(
-        'SELECT orig_Cat FROM fidimo_source_pop GROUP BY orig_cat HAVING COUNT(*) > 1;')
+        'SELECT orig_cat FROM fidimo_source_pop GROUP BY orig_cat HAVING COUNT(*) > 1;')
     split_reach_cats = [x[0] for x in fidimo_db.fetchall()]
     for i in split_reach_cats:
         if realisation == True:
@@ -1102,6 +1102,11 @@ def fidimo_source_pop( source_pop_csv,
     fidimo_db.execute(
         '''UPDATE fidimo_source_pop SET source_pop=0.0 WHERE source_pop IS NULL OR source_pop='';''')
     fidimo_database.commit()
+    
+    # Add index to source_pop
+    fidimo_db.execute('''DROP INDEX IF EXISTS fidimo_source_pop_index''')
+    fidimo_db.execute(
+        '''CREATE INDEX fidimo_source_pop_index ON fidimo_source_pop (cat)''')
     
     # First check if source_pop already exists in fidimo distance and create
     # if not exist
