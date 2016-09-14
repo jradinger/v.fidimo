@@ -63,18 +63,19 @@ set_fidimo_db(fidimo_db_path=fidimo_db_path)
 # Calculate distance between single river reaches
 fidimo_distance(fidimo_db_path = fidimo_db_path)
 
-# Calculate dispersal distances
-my_sigma_dict = sigma_calc(	l=l,
-							ar=ar,
-							t=t,
-							statistical_interval=statistical_interval,
-							fishmove_seed=999)
 
 # Append source populations
 fidimo_source_pop(input=input,
 				source_col=source_col,
 				fidimo_db_path=fidimo_db_path,
 				realisation=True)
+				
+# Calculate dispersal distances
+my_sigma_dict = sigma_calc(	l=l,
+							ar=ar,
+							t=t,
+							statistical_interval=statistical_interval,
+							fishmove_seed=999)				
 
 # Calcuate fidimo probability
 fidimo_probability(fidimo_db_path=fidimo_db_path,

@@ -941,7 +941,7 @@ def sigma_calc(l,
                seed_fishmove=None):
     '''This function calculates dispersal distances sigma_stat and sigma_mob
     for each stream order and for given input: l, ar, t'''
-
+    
     # Regression model to calculate dispersal kernel parameter sigma_stat and
     # sigma_mob
     if statistical_interval == "no":
@@ -954,29 +954,29 @@ def sigma_calc(l,
                 "fit": dict(zip(range(1, 10), [math.exp(-10.56720 + 1.643237 * math.log(l) + 0.9647056 * ar + 1.142661 * math.sqrt(i) + 0.4273618 * math.log(t)) for i in (1, 2, 3, 4, 5, 6, 7, 8, 9)]))},
             "mob": {
                 "fit": dict(zip(range(1, 10), [math.exp(-7.480260 + 1.445552 * math.log(l) + 0.5820339 * ar + 1.507528 * math.sqrt(i) + 0.5527266 * math.log(t)) for i in (1, 2, 3, 4, 5, 6, 7, 8, 9)]))}}
-
+                
         return sigma_dict
-
+        
     else:
         import rpy2.robjects as robjects  # import required rpy2 module
         from rpy2.robjects.packages import importr
         fm = importr('fishmove')
-
+        
         # Calculating 'fishmove' depending on species or L & AR
         # Statistical interval
         if "prediction" in statistical_interval:
             interval = "prediction"
         elif "confidence" in statistical_interval:
             interval = "confidence"
-
+            
         # Set fixed seed if specified
         if seed_fishmove:
             seed = ",seed=" + str(seed_fishmove)
         else:
             seed = ""
-
+            
         so_rvector = robjects.IntVector((1, 2, 3, 4, 5, 6, 7, 8, 9))
-
+        
         # Calculate 'fishmove' and store sigma values in pandas df
         fishmove = eval(
             "fm.fishmove(L=l,AR=ar,SO=so_rvector,T=t,interval=interval,rep=200%s)" % (seed))
@@ -989,7 +989,7 @@ def sigma_calc(l,
             "mob": {"fit": dict(zip(range(1, 10), list(fishmove.rx("fit", 'sigma_mob', 1, 1, so_rvector, 1)))),
                     "lwr": dict(zip(range(1, 10), list(fishmove.rx("lwr", 'sigma_mob', 1, 1, so_rvector, 1)))),
                     "upr": dict(zip(range(1, 10), list(fishmove.rx("upr", 'sigma_mob', 1, 1, so_rvector, 1))))}}
-
+                    
         return sigma_dict
 
 
@@ -1152,15 +1152,16 @@ def fidimo_probability( fidimo_db_path,
                         truncation="inf"):
     '''This function calculates dispersal kernel probabilities
     for each river reach and corresponding distances between reaches'''
-
+    
     # connect to database
     fidimo_database = sqlite3.connect(fidimo_db_path)
     fidimo_db = fidimo_database.cursor()
-
+    
     # Get stream orders (ASC) of source populations where source_pop > 0
     fidimo_db.execute(
         '''SELECT DISTINCT source_strahler FROM fidimo_distance WHERE source_pop > 0''')
     so_list = sorted([x[0] for x in fidimo_db.fetchall()])
+    print("Test0")
     if None in so_list:
         raise ValueError(
             "At least one stream reach with a source population has no value for Strahler stream order")
@@ -1170,9 +1171,10 @@ def fidimo_probability( fidimo_db_path,
             "Stream network has stream orders > 9. Please consider smaller stream network")
     else:
         so_list = [int(x) for x in so_list]
-
+        
     # First check if fidimo_prob already exists in fidimo distance and create
     # if not exist
+    print("Test1")
     fidimo_db.execute('SELECT * FROM fidimo_distance LIMIT 1')
     if "basic_fidimo_prob" not in [x[0] for x in fidimo_db.description]:
         fidimo_db.execute(
@@ -1181,34 +1183,35 @@ def fidimo_probability( fidimo_db_path,
             '''ALTER TABLE fidimo_distance ADD COLUMN basic_fidimo_prob_lwr DOUBLE''')
         fidimo_db.execute(
             '''ALTER TABLE fidimo_distance ADD COLUMN basic_fidimo_prob_upr DOUBLE''')
-
+    print("Test2")    
     # Before any calculations set fidimo_prob in fidimo_distance to ''
     fidimo_db.execute(
         '''UPDATE fidimo_distance SET basic_fidimo_prob=NULL,basic_fidimo_prob_lwr=NULL,basic_fidimo_prob_upr=NULL;''')
     fidimo_database.commit()
-
+    
     # Delete fidimo_prob if exists
     fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_prob''')
-
+    print("Test3")
     # Get number of runs for statistical intervals
     if statistical_interval == "no":
         nrun = ["fit"]
     else:
         nrun = ["fit", "lwr", "upr"]
-
+        
     # Create a new sqlite table in fidimo_db to collect results
     fidimo_db.execute('''CREATE TABLE fidimo_prob ( fidimo_distance_id INTEGER, 
                           basic_fidimo_prob DOUBLE, 
                           basic_fidimo_prob_lwr DOUBLE, 
                           basic_fidimo_prob_upr DOUBLE)''')
-
+    
     # Commit changes
     fidimo_database.commit()
-
+    
     #grass.debug(_("Begin with core of fidimo, application of fishmove"))
     print("Begin with core of fidimo, application of fishmove")
-
+    
     for i in so_list:
+        #i=2
         # Calculate maximum distance (cutting distance) based on truncation
         # criterion (based on p=0.67)
         if truncation != "inf":
@@ -1216,107 +1219,123 @@ def fidimo_probability( fidimo_db_path,
                                                    args=(sigma_dict["stat"]["fit"][i], sigma_dict["mob"]["fit"][i], float(truncation), 0.67)))
         else:
             max_dist = 1e8  # Max distance = 100000 km
-
+            
         direction_dict = {"downstream": 1,
                           "upstream": 2, "undef": 3, "source": 4}
-
+        
         for j in direction_dict:  # loop over directions (up- vs. downstream)
             ''' calculate fidimo probability in chunks based on source_strahler
             MAIN PART: leptokurtic probability density kernel based on fishmove '''
-
+            
             # Do not calculate any fidimo probability for direction that are
             # combinations of down- and upstream (as in r.fidimo)
             if j == "undef":
                 continue
-
+                
             print("Calculation of Fidimo probability for direction: " +
                   j + " and stream order: " + str(i))
-
+            
+            # Create temp table to collect rows for a specific stream order
+            fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_prob_calculation_tmp''')
+            
+            fidimo_db.execute('''CREATE TABLE fidimo_prob_calculation_tmp AS SELECT
+              fidimo_distance_id AS fidimo_distance_id,
+              upr_limit AS upr_limit,
+              lwr_limit AS lwr_limit,
+              source_shreve AS source_shreve,
+              target_shreve AS target_shreve
+              FROM fidimo_distance
+              WHERE source_strahler = ?
+              AND distance <= ? 
+              AND direction = ?
+              AND source_pop > 0''', (i, max_dist, direction_dict[j]))
+            
             # Get all IDs for cases where distance, direction, source_pop and
-            # source_strahler match criteria
-            fidimo_db.execute('''SELECT fidimo_distance_id FROM fidimo_distance 
-        WHERE source_strahler = ?
-          AND distance <= ? 
-          AND direction = ?
-          AND source_pop > 0''', (i, max_dist, direction_dict[j]))
-
+            # source_strahler match criteria            
+            #fidimo_db.execute('''SELECT fidimo_distance_id FROM fidimo_distance 
+            #          WHERE source_strahler = ?
+            #          AND distance <= ? 
+            #          AND direction = ?
+            #          AND source_pop > 0''', (i, max_dist, direction_dict[j]))
+            
             # Split all cases into chunks of max. chunk_size
-            row_ids = [x[0] for x in fidimo_db.fetchall()]
-            chunk_size = 500
-            row_ids_chunks = [row_ids[x:x + chunk_size]
-                              for x in xrange(0, len(row_ids), chunk_size)]
-
-            for k in range(len(row_ids_chunks)):
+            fidimo_db.execute('''SELECT max(rowid) FROM fidimo_prob_calculation_tmp''')
+            max_fidimo_prob_calculation_tmp_rowid = [x[0] for x in fidimo_db.fetchall()][0]
+            fidimo_prob_calculation_rowid_chunks = [[x+1,x + 500] for x in xrange(0, max_fidimo_prob_calculation_tmp_rowid, int(500))]
+            
+            for k in range(len(fidimo_prob_calculation_rowid_chunks)):
+                #k=1
                 print("Processing chunk: " + str(k + 1) +
-                      " of " + str(len(row_ids_chunks)))
-                chunk = row_ids_chunks[k]
-                fidimo_db.execute('SELECT * FROM fidimo_distance WHERE fidimo_distance_id IN (%s)' %
-                                  ','.join('?' * len(chunk)), tuple(chunk))
-                fidimo_distance_colnames = dict(
+                      " of " + str(len(fidimo_prob_calculation_rowid_chunks)))
+                               
+                #chunk = fidimo_prob_calculation_rowid_chunks[k]
+                
+                fidimo_db.execute('''SELECT * FROM fidimo_prob_calculation_tmp 
+                  WHERE rowid BETWEEN %s and %s;'''%(fidimo_prob_calculation_rowid_chunks[k][0],fidimo_prob_calculation_rowid_chunks[k][1]))
+                fidimo_prob_calculation_colnames = dict(
                     zip([x[0] for x in fidimo_db.description], range(0, len(fidimo_db.description))))
-                fidimo_distance_array = scipy.array(fidimo_db.fetchall())
-
+                fidimo_prob_calculation_array = scipy.array(fidimo_db.fetchall())
+                #fidimo_db.execute('SELECT * FROM fidimo_distance WHERE fidimo_distance_id IN (%s)' %
+                 #                 ','.join('?' * len(chunk)), tuple(chunk))
+                #fidimo_distance_colnames = dict(
+                #    zip([x[0] for x in fidimo_db.description], range(0, len(fidimo_db.description))))
+                #fidimo_distance_array = scipy.array(fidimo_db.fetchall())
+                
                 # Create results array to collect fidimo_prob results
-                fidimo_result_array = scipy.array(chunk)
-
+                fidimo_result_array = fidimo_prob_calculation_array[:, fidimo_prob_calculation_colnames["fidimo_distance_id"]].astype(int)
+                
                 for l in nrun:
+                    #l="fit"
                     # CDF(upr) - CDF(lwr)
                     if j == "source":
-                        basic_fidimo_prob = (fidimo_kernel_cdf(x=fidimo_distance_array[:, fidimo_distance_colnames["upr_limit"]].astype(float),
-                                                               sigma_stat=sigma_dict[
-                            "stat"][l][i],
-                            sigma_mob=sigma_dict[
-                            "mob"][l][i],
-                            p=p) - fidimo_kernel_cdf( x=0,
-                                                      sigma_stat=sigma_dict[
-                                                          "stat"][l][i],
-                                                      sigma_mob=sigma_dict[
-                                                          "mob"][l][i],
+                        basic_fidimo_prob = (fidimo_kernel_cdf(x=fidimo_prob_calculation_array[:, fidimo_prob_calculation_colnames["upr_limit"]].astype(float),
+                                                              sigma_stat=sigma_dict["stat"][l][i],
+                                                              sigma_mob=sigma_dict["mob"][l][i],
+                                                              p=p) - 
+                                            fidimo_kernel_cdf( x=0,
+                                                      sigma_stat=sigma_dict["stat"][l][i],
+                                                      sigma_mob=sigma_dict["mob"][l][i],
                                                       p=p)) * 2.0
                     elif j == "upstream" or j == "downstream":
-                        basic_fidimo_prob = fidimo_kernel_cdf(x=fidimo_distance_array[:, fidimo_distance_colnames["upr_limit"]].astype(float),
-                                                              sigma_stat=sigma_dict[
-                            "stat"][l][i],
-                            sigma_mob=sigma_dict[
-                            "mob"][l][i],
-                            p=p) - fidimo_kernel_cdf( x=fidimo_distance_array[:, fidimo_distance_colnames["lwr_limit"]].astype(float),
-                                                      sigma_stat=sigma_dict[
-                                                          "stat"][l][i],
-                                                      sigma_mob=sigma_dict[
-                                                          "mob"][l][i],
+                        basic_fidimo_prob = fidimo_kernel_cdf(x=fidimo_prob_calculation_array[:, fidimo_prob_calculation_colnames["upr_limit"]].astype(float),
+                                                      sigma_stat=sigma_dict["stat"][l][i],
+                                                      sigma_mob=sigma_dict["mob"][l][i],
+                                                      p=p) - fidimo_kernel_cdf( x=fidimo_prob_calculation_array[:, fidimo_prob_calculation_colnames["lwr_limit"]].astype(float),
+                                                      sigma_stat=sigma_dict["stat"][l][i],
+                                                      sigma_mob=sigma_dict["mob"][l][i],
                                                       p=p)
-
+                                                      
                     # if upstream direction than correct for network splits by
                     # a shreve stream order approach
                     if j == "upstream":
-                        basic_fidimo_prob = basic_fidimo_prob * (fidimo_distance_array[:, fidimo_distance_colnames["target_shreve"]].astype(
-                            float) / fidimo_distance_array[:, fidimo_distance_colnames["source_shreve"]].astype(float))
-
+                        basic_fidimo_prob = basic_fidimo_prob * (fidimo_prob_calculation_array[:, fidimo_prob_calculation_colnames["target_shreve"]].astype(
+                            float) / fidimo_prob_calculation_array[:, fidimo_prob_calculation_colnames["source_shreve"]].astype(float))
+                        
                     # Set all values that are 0 (i.e. to small to be calculated
                     # to a the minimum float number possible)
                     basic_fidimo_prob[
                         basic_fidimo_prob == 0] = sys.float_info.min
-
+                        
                     # Stack fidimo_prob with fidimo_distance id into result
                     # array
                     fidimo_result_array = numpy.column_stack(
                         (fidimo_result_array,  # fidimo_distance_id
                          basic_fidimo_prob))  # fidimo_prob for single nrun
-
+                    
                 if statistical_interval == "no":
                     fidimo_db.executemany("INSERT INTO fidimo_prob (fidimo_distance_id,basic_fidimo_prob) VALUES (?,?)", map(
                         tuple, fidimo_result_array.tolist()))
                 else:
                     fidimo_db.executemany("INSERT INTO fidimo_prob (fidimo_distance_id,basic_fidimo_prob,basic_fidimo_prob_lwr,basic_fidimo_prob_upr) VALUES (?,?,?,?)", map(
                         tuple, fidimo_result_array.tolist()))
-
+                    
                 # Commit changes
                 fidimo_database.commit()
-
+                
     # Create key in final fidimo_prob
     fidimo_db.execute(
         '''CREATE INDEX fidimo_prob_index ON fidimo_prob (fidimo_distance_id)''')
-
+    
     # Join fidimo_prob with fidimo_distance
     print(
         "Update fidimo_distance with basic (unweighted) fidimo probabilities")
@@ -1325,30 +1344,31 @@ def fidimo_probability( fidimo_db_path,
                 basic_fidimo_prob_lwr = (SELECT basic_fidimo_prob_lwr FROM fidimo_prob WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id),
                 basic_fidimo_prob_upr = (SELECT basic_fidimo_prob_upr FROM fidimo_prob WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id)
                  WHERE EXISTS (SELECT fidimo_distance_id FROM fidimo_prob WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id)''')
-
+    
     print("Update Metadata")
     fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Fidimo probabilities calculated"''',
                       (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
     fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Last modified"''',
                       (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
-
+    
     # Commit changes
     fidimo_database.commit()
-
+    
     # Close database connection
     fidimo_database.close()
 
 
 def fidimo_realisation( realisation,
+                        statistical_interval,
                         fidimo_db_path):
     '''This function either weights the fidimo probabilities with the value of the value of
     the source population or calculates realised fish count (real integer values) from the
     probabilities using the multinomial distribution'''
-
+    
     # connect to database
     fidimo_database = sqlite3.connect(fidimo_db_path)
     fidimo_db = fidimo_database.cursor()
-
+    
     # First check if fidimo_result already exists in fidimo distance and
     # create if not exist
     fidimo_db.execute('SELECT * FROM fidimo_distance LIMIT 1')
@@ -1359,16 +1379,17 @@ def fidimo_realisation( realisation,
             '''ALTER TABLE fidimo_distance ADD COLUMN fidimo_result_lwr DOUBLE''')
         fidimo_db.execute(
             '''ALTER TABLE fidimo_distance ADD COLUMN fidimo_result_upr DOUBLE''')
-
+        
     # Before any calculations set fidimo_result in fidimo_distance to ''
+    print("Test1")
     fidimo_db.execute(
         '''UPDATE fidimo_distance SET fidimo_result=NULL,fidimo_result_lwr=NULL,fidimo_result_upr=NULL;''')
     fidimo_database.commit()
-
+    
     if realisation == True:
         print(
             "Calculate realisation (i.e. fish counts that disperse from each source population)")
-
+        
         # Get number of runs for statistical intervals
         fidimo_db.execute('''SELECT SUM(basic_fidimo_prob) AS basic_fidimo_prob,
                   SUM(basic_fidimo_prob_lwr) AS basic_fidimo_prob_lwr, 
@@ -1376,18 +1397,18 @@ def fidimo_realisation( realisation,
               FROM fidimo_distance''')
         nrun = zip([x[0] for x in fidimo_db.description], [
                    x != None for x in fidimo_db.fetchall()[0]])
-
+        
         # Realisation using the mutlinomial distribution to obtain indiviual counts
         # Get ids of all source reaches that have source_pop>0
         fidimo_db.execute(
             'SELECT DISTINCT from_orig_v,source_pop FROM fidimo_distance WHERE source_pop>0')
         source_populations = [[x[0], x[1]] for x in fidimo_db.fetchall()]
-
+        
         # Insert results of realisation in temporary table and then update
         # fidimo_distance from that table
         fidimo_db.execute('''CREATE TEMP TABLE realisation_result_tmp 
               (fidimo_distance_id INTEGER, fidimo_result DOUBLE, fidimo_result_lwr DOUBLE, fidimo_result_upr DOUBLE)''')
-
+        
         for i in source_populations:
             fidimo_db.execute(
                 '''SELECT * FROM fidimo_distance WHERE from_orig_v = ?''', (i[0],))
@@ -1402,15 +1423,15 @@ def fidimo_realisation( realisation,
                     continue
                 basic_fidimo_prob = numpy.nan_to_num(
                     fidimo_distance_array[:, fidimo_distance_colnames[j[0]]].astype(float))
-
+                
                 # if options['seed2']:
                 # numpy.random.seed(int(optionss['seed2']))
                 realised_fidimo_result_i = numpy.random.multinomial(int(i[1]),
                                                                     (basic_fidimo_prob / numpy.sum(basic_fidimo_prob)))
-
+                
                 realised_fidimo_result = numpy.column_stack((realised_fidimo_result,
                                                              realised_fidimo_result_i.astype(int)))
-
+                
             if sum([x[1] for x in nrun]) == 1:
                 fidimo_db.executemany('''INSERT INTO realisation_result_tmp 
             (fidimo_distance_id, fidimo_result) 
@@ -1422,7 +1443,7 @@ def fidimo_realisation( realisation,
             else:
                 print(
                     "Realisation cannot be calculated due to some statistical intervals")
-
+                
         # Join fidimo_prob with fidimo_distance
         print(
             "Update fidimo_distance with realised fidimo results (i.e. fish counts)")
@@ -1431,7 +1452,7 @@ def fidimo_realisation( realisation,
                 fidimo_result_lwr = (SELECT fidimo_result_lwr FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id),
                 fidimo_result_upr = (SELECT fidimo_result_upr FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id)
                  WHERE EXISTS (SELECT fidimo_distance_id FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id)''')
-
+        
     else:
         # Multiply by value of inital source population
         print(
@@ -1440,15 +1461,15 @@ def fidimo_realisation( realisation,
                   fidimo_result = basic_fidimo_prob*source_pop,
                   fidimo_result_lwr = basic_fidimo_prob_lwr*source_pop,
                   fidimo_result_upr = basic_fidimo_prob_upr*source_pop''')
-
+        
     # Update metadata
     print("Update Metadata")
     fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Last modified"''',
                       (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
-
+    
     # Commit changes
     fidimo_database.commit()
-
+    
     # Close database connection
     fidimo_database.close()
 
@@ -1644,6 +1665,7 @@ def main():
         # Calculate realisation or multiplication by value of initial source
         # population
         fidimo_realisation( realisation=flags['r'],
+                            statistical_interval=statistical_interval,
                             fidimo_db_path=fidimo_db_path)
 
         # Get sum of fidimo results for each target reach
