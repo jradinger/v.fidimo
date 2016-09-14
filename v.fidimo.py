@@ -1121,7 +1121,7 @@ def fidimo_source_pop( source_pop_csv,
     for k in range(len(fidimo_distance_rowid_chunks)):
         print("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))) 
         fidimo_db.execute('''UPDATE fidimo_distance SET 
-                      source_pop = (SELECT source_pop FROM fidimo_source_pop WHERE cat=fidimo_distance.orig_v)
+                      source_pop = (SELECT source_pop FROM fidimo_source_pop WHERE cat=fidimo_distance.from_orig_v)
                       WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
         fidimo_database.commit()
     
