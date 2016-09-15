@@ -144,6 +144,15 @@
 #% options:no,confidence_interval,prediction_interval
 #% answer:no
 #%end
+#%option
+#% key: truncation
+#% type: integer
+#% key_desc: truncation
+#% description: Truncation distance threshold (m). Connections between reaches with distance>truncation will be ignored.
+#% required: no
+#% answer: -1
+#% guisection: Output
+#%end
 
 #%flag
 #% key: u
@@ -717,7 +726,8 @@ def add_midpoints_fidimo_db(fidimo_db_path):
     fidimo_database.close()
 
 
-def fidimo_distance(fidimo_db_path):
+def fidimo_distance(fidimo_db_path,
+                    truncation=-1):
     '''This function fetches all vertices/edges from the
     corresponding tables of the fidimo database and builds
     the directed graph/network based on the igraph library.
@@ -737,6 +747,12 @@ def fidimo_distance(fidimo_db_path):
     
     # Add midpoints to calculate distance between single river reaches
     add_midpoints_fidimo_db(fidimo_db_path)
+    
+    # Set distance threshold
+    if int(truncation) < 0:
+            max_dist = 1e8 # Max distance = 100000 km
+    else:
+            max_dist = int(truncation)  
     
     # Update main distance matrix
     #grass.message(_("Update main distance matrix (fidimo_distance) between all connected river reaches..."))
@@ -817,7 +833,7 @@ def fidimo_distance(fidimo_db_path):
             
             #grass.message(_("Updating distance matrix for specific network"))
             print("Updating distance matrix for specific network and chunk")
-            paths_to_db = zip([x for item in g_midpoints_chunks[k] for x in repeat(item, len(midpoints))],  # list of all source/from midpoints of reaches
+            paths_to_db = numpy.array([x for item in g_midpoints_chunks[k] for x in repeat(item, len(midpoints))],  # list of all source/from midpoints of reaches
                               # list of all target/to midpoints of reaches
                               midpoints * len(g_midpoints_chunks[k]),
                               # list of distances
@@ -825,6 +841,10 @@ def fidimo_distance(fidimo_db_path):
                               # list of directions
                               [item for sublist in direction_mat for item in sublist],
                               [i] * (len(midpoints)*len(g_midpoints_chunks[k])))  # network
+            
+            # Only select those network connection that are below the threshold distance
+            paths_to_db = zip(*paths_to_db[:,paths_to_db[2,:]<max_dist])
+            
             print("Updating distance matrix for specific network and chunk 2")
             fidimo_db.executemany(
                 "INSERT INTO fidimo_distance (source,target,distance,direction,network) VALUES (?,?,?,?,?)", paths_to_db)
@@ -1148,8 +1168,7 @@ def fidimo_source_pop( source_pop_csv,
 def fidimo_probability( fidimo_db_path,
                         sigma_dict,
                         p,
-                        statistical_interval,
-                        truncation="inf"):
+                        statistical_interval):
     '''This function calculates dispersal kernel probabilities
     for each river reach and corresponding distances between reaches'''
     
@@ -1212,14 +1231,6 @@ def fidimo_probability( fidimo_db_path,
     
     for i in so_list:
         #i=2
-        # Calculate maximum distance (cutting distance) based on truncation
-        # criterion (based on p=0.67)
-        if truncation != "inf":
-            max_dist = float(optimize.zeros.newton(fidimo_kernel_cdf_truncation, 1.,
-                                                   args=(sigma_dict["stat"]["fit"][i], sigma_dict["mob"]["fit"][i], float(truncation), 0.67)))
-        else:
-            max_dist = 1e8  # Max distance = 100000 km
-            
         direction_dict = {"downstream": 1,
                           "upstream": 2, "undef": 3, "source": 4}
         
@@ -1246,18 +1257,9 @@ def fidimo_probability( fidimo_db_path,
               target_shreve AS target_shreve
               FROM fidimo_distance
               WHERE source_strahler = ?
-              AND distance <= ? 
               AND direction = ?
-              AND source_pop > 0''', (i, max_dist, direction_dict[j]))
-            
-            # Get all IDs for cases where distance, direction, source_pop and
-            # source_strahler match criteria            
-            #fidimo_db.execute('''SELECT fidimo_distance_id FROM fidimo_distance 
-            #          WHERE source_strahler = ?
-            #          AND distance <= ? 
-            #          AND direction = ?
-            #          AND source_pop > 0''', (i, max_dist, direction_dict[j]))
-            
+              AND source_pop > 0''', (i, direction_dict[j]))
+                      
             # Split all cases into chunks of max. chunk_size
             fidimo_db.execute('''SELECT max(rowid) FROM fidimo_prob_calculation_tmp''')
             max_fidimo_prob_calculation_tmp_rowid = [x[0] for x in fidimo_db.fetchall()][0]
@@ -1385,23 +1387,22 @@ def fidimo_realisation( realisation,
     fidimo_db.execute(
         '''UPDATE fidimo_distance SET fidimo_result=NULL,fidimo_result_lwr=NULL,fidimo_result_upr=NULL;''')
     fidimo_database.commit()
+    print("Test2")
     
     if realisation == True:
         print(
             "Calculate realisation (i.e. fish counts that disperse from each source population)")
         
         # Get number of runs for statistical intervals
-        fidimo_db.execute('''SELECT SUM(basic_fidimo_prob) AS basic_fidimo_prob,
-                  SUM(basic_fidimo_prob_lwr) AS basic_fidimo_prob_lwr, 
-                  SUM(basic_fidimo_prob_upr) AS basic_fidimo_prob_upr 
-              FROM fidimo_distance''')
-        nrun = zip([x[0] for x in fidimo_db.description], [
-                   x != None for x in fidimo_db.fetchall()[0]])
+        if statistical_interval == "no":
+            nrun = zip(["basic_fidimo_prob", "basic_fidimo_prob_lwr", "basic_fidimo_prob_upr"],[True,False,False])
+        else:
+            nrun = zip(["basic_fidimo_prob", "basic_fidimo_prob_lwr", "basic_fidimo_prob_upr"],[True,True,True])
         
         # Realisation using the mutlinomial distribution to obtain indiviual counts
         # Get ids of all source reaches that have source_pop>0
         fidimo_db.execute(
-            'SELECT DISTINCT from_orig_v,source_pop FROM fidimo_distance WHERE source_pop>0')
+            'SELECT DISTINCT cat,source_pop FROM fidimo_source_pop WHERE source_pop>0')
         source_populations = [[x[0], x[1]] for x in fidimo_db.fetchall()]
         
         # Insert results of realisation in temporary table and then update
@@ -1409,9 +1410,16 @@ def fidimo_realisation( realisation,
         fidimo_db.execute('''CREATE TEMP TABLE realisation_result_tmp 
               (fidimo_distance_id INTEGER, fidimo_result DOUBLE, fidimo_result_lwr DOUBLE, fidimo_result_upr DOUBLE)''')
         
+        # Create index on fidimo_distance to improve query based on from_orig_v
+        fidimo_db.execute('''CREATE INDEX fidimo_distance_index_from_orig_v ON fidimo_distance (from_orig_v)''')
+        
         for i in source_populations:
             fidimo_db.execute(
-                '''SELECT * FROM fidimo_distance WHERE from_orig_v = ?''', (i[0],))
+                '''SELECT fidimo_distance_id, 
+                basic_fidimo_prob, 
+                basic_fidimo_prob_lwr, 
+                basic_fidimo_prob_upr
+                FROM fidimo_distance WHERE from_orig_v = ?''', (i[0],))
             fidimo_distance_colnames = dict(
                 zip([x[0] for x in fidimo_db.description], range(0, len(fidimo_db.description))))
             fidimo_distance_array = scipy.array(fidimo_db.fetchall())
@@ -1443,6 +1451,13 @@ def fidimo_realisation( realisation,
             else:
                 print(
                     "Realisation cannot be calculated due to some statistical intervals")
+        
+        # Drop index from fidimo distance
+        fidimo_db.execute('''DROP INDEX IF EXISTS fidimo_distance_index_from_orig_v''')
+        
+        # Create index on realisation_result_tmp
+        fidimo_db.execute('''CREATE INDEX realisation_result_tmp_index ON realisation_result_tmp (fidimo_distance_id)''')
+
                 
         # Join fidimo_prob with fidimo_distance
         print(
@@ -1602,6 +1617,7 @@ def main():
     fidimo_db_path = options['fidimo_db_path']
     passability_col = options['passability_col']
     threshold = options['threshold']
+    truncation = options['truncation']
 
     source_pop_csv = options['source_pop_csv']
     l = options['l']
@@ -1641,7 +1657,8 @@ def main():
         set_fidimo_db(fidimo_db_path=fidimo_db_path)
 
         # Calculate distance between single river reaches
-        fidimo_distance(fidimo_db_path=fidimo_db_path)
+        fidimo_distance(fidimo_db_path=fidimo_db_path,
+                        truncation=truncation)
 
     if not (flags['n'] or flags['f']):
         # Append source populations
