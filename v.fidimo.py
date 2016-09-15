@@ -833,14 +833,14 @@ def fidimo_distance(fidimo_db_path,
             
             #grass.message(_("Updating distance matrix for specific network"))
             print("Updating distance matrix for specific network and chunk")
-            paths_to_db = numpy.array([x for item in g_midpoints_chunks[k] for x in repeat(item, len(midpoints))],  # list of all source/from midpoints of reaches
+            paths_to_db = numpy.array([[x for item in g_midpoints_chunks[k] for x in repeat(item, len(midpoints))],  # list of all source/from midpoints of reaches
                               # list of all target/to midpoints of reaches
                               midpoints * len(g_midpoints_chunks[k]),
                               # list of distances
                               [item for sublist in distance_mat_all for item in sublist],
                               # list of directions
                               [item for sublist in direction_mat for item in sublist],
-                              [i] * (len(midpoints)*len(g_midpoints_chunks[k])))  # network
+                              [i] * (len(midpoints)*len(g_midpoints_chunks[k]))])  # network
             
             # Only select those network connection that are below the threshold distance
             paths_to_db = zip(*paths_to_db[:,paths_to_db[2,:]<max_dist])
