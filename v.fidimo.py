@@ -832,7 +832,7 @@ def fidimo_distance(fidimo_db_path,
             gc.collect()
             
             #grass.message(_("Updating distance matrix for specific network"))
-            print("Updating distance matrix for specific network and chunk")
+            print("Updating distance matrix for specific network and chunk - part 1")
             paths_to_db = numpy.array([[x for item in g_midpoints_chunks[k] for x in repeat(item, len(midpoints))],  # list of all source/from midpoints of reaches
                               # list of all target/to midpoints of reaches
                               midpoints * len(g_midpoints_chunks[k]),
@@ -845,7 +845,7 @@ def fidimo_distance(fidimo_db_path,
             # Only select those network connection that are below the threshold distance
             paths_to_db = zip(*paths_to_db[:,paths_to_db[2,:]<max_dist])
             
-            print("Updating distance matrix for specific network and chunk 2")
+            print("Updating distance matrix for specific network and chunk - part 2")
             fidimo_db.executemany(
                 "INSERT INTO fidimo_distance (source,target,distance,direction,network) VALUES (?,?,?,?,?)", paths_to_db)
             fidimo_database.commit()
@@ -1500,6 +1500,11 @@ def fidimo_summarize( output,
 
     # First, delete summary_fidimo_prob if exists
     fidimo_db.execute('''DROP TABLE IF EXISTS summary_fidimo_result''')
+    
+    # Create index on fidimo_distance (to_orig_v)
+    fidimo_db.execute('''DROP INDEX IF EXISTS fidimo_distance_index_to_orig_v''')
+    fidimo_db.execute('''CREATE INDEX fidimo_distance_index_to_orig_v ON fidimo_distance (to_orig_v)''')
+
 
     # Summarize fidimo prob for each target reach
     fidimo_db.execute('''CREATE TABLE summary_fidimo_result AS SELECT
@@ -1509,6 +1514,9 @@ def fidimo_summarize( output,
     CAST(SUM(fidimo_result_lwr) AS DOUBLE) AS fidimo_result_lwr,
     CAST(SUM(fidimo_result_upr) AS DOUBLE) AS fidimo_result_upr 
     FROM fidimo_distance GROUP BY to_orig_v;''')
+
+    # Drop index on fidimo_distance (to_orig_v)
+    fidimo_db.execute('''DROP INDEX IF EXISTS fidimo_distance_index_to_orig_v''')
 
     fidimo_db.execute(
         '''ALTER TABLE summary_fidimo_result ADD COLUMN source_pop DOUBLE''')
