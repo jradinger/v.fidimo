@@ -595,8 +595,8 @@ def fidimo_network(input,
                       quiet=quiet,
                       map=output,
                       layer=1,
-                      columns='''reach_length DOUBLE, source_pop DOUBLE, fidimo_result DOUBLE, fidimo_result_lwr DOUBLE, 
-    fidimo_result_upr DOUBLE, rel_fidimo_result DOUBLE, rel_fidimo_result_lwr DOUBLE, rel_fidimo_result_upr DOUBLE''')
+                      columns='''length DOUBLE, source_pop DOUBLE, fidimo DOUBLE, fidimo_lwr DOUBLE, 
+    fidimo_upr DOUBLE, rel DOUBLE, rel_lwr DOUBLE, rel_upr DOUBLE''')
     
     #grass.message(_("Final networks prepared for FIDIMO"))
     print("Final networks prepared for FIDIMO")
@@ -1458,24 +1458,31 @@ def fidimo_realisation( realisation,
         # Create index on realisation_result_tmp
         fidimo_db.execute('''CREATE INDEX realisation_result_tmp_index ON realisation_result_tmp (fidimo_distance_id)''')
 
-                
+        # Get number of rows of fidimo_distance and chunk it into pieces of 10E5
+        fidimo_db.execute('''SELECT max(rowid) FROM fidimo_distance''')
+        max_fidimo_distance_rowid = [x[0] for x in fidimo_db.fetchall()][0]
+        fidimo_distance_rowid_chunks = [[x+1,x + 10E5] for x in xrange(0, max_fidimo_distance_rowid, int(10E5))]
+        
         # Join fidimo_prob with fidimo_distance
-        print(
-            "Update fidimo_distance with realised fidimo results (i.e. fish counts)")
-        fidimo_db.execute('''UPDATE fidimo_distance SET 
-                fidimo_result = (SELECT fidimo_result FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id),
-                fidimo_result_lwr = (SELECT fidimo_result_lwr FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id),
-                fidimo_result_upr = (SELECT fidimo_result_upr FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id)
-                 WHERE EXISTS (SELECT fidimo_distance_id FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id)''')
+        print("Update fidimo_distance with realised fidimo results (i.e. fish counts)...")
+        for k in range(len(fidimo_distance_rowid_chunks)):
+            print("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks)))        
+            fidimo_db.execute('''UPDATE fidimo_distance SET 
+                    fidimo_result = (SELECT fidimo_result FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id),
+                    fidimo_result_lwr = (SELECT fidimo_result_lwr FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id),
+                    fidimo_result_upr = (SELECT fidimo_result_upr FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id)
+                    WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
         
     else:
-        # Multiply by value of inital source population
-        print(
-            "Update fidimo_distance with source-population-weighted fidimo probability")
-        fidimo_db.execute('''UPDATE fidimo_distance SET
-                  fidimo_result = basic_fidimo_prob*source_pop,
-                  fidimo_result_lwr = basic_fidimo_prob_lwr*source_pop,
-                  fidimo_result_upr = basic_fidimo_prob_upr*source_pop''')
+        # Join fidimo_prob with fidimo_distance
+        print("Update fidimo_distance with source-population-weighted fidimo probability...")
+        for k in range(len(fidimo_distance_rowid_chunks)):
+            print("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks)))  # Multiply by value of inital source population
+            fidimo_db.execute('''UPDATE fidimo_distance SET
+                      fidimo_result = basic_fidimo_prob*source_pop,
+                      fidimo_result_lwr = basic_fidimo_prob_lwr*source_pop,
+                      fidimo_result_upr = basic_fidimo_prob_upr*source_pop
+                      WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
         
     # Update metadata
     print("Update Metadata")
@@ -1502,11 +1509,13 @@ def fidimo_summarize( output,
     fidimo_db.execute('''DROP TABLE IF EXISTS summary_fidimo_result''')
     
     # Create index on fidimo_distance (to_orig_v)
+    print("Test: Create index")
     fidimo_db.execute('''DROP INDEX IF EXISTS fidimo_distance_index_to_orig_v''')
     fidimo_db.execute('''CREATE INDEX fidimo_distance_index_to_orig_v ON fidimo_distance (to_orig_v)''')
 
 
     # Summarize fidimo prob for each target reach
+    print("Sum up fidimo result per target reach")
     fidimo_db.execute('''CREATE TABLE summary_fidimo_result AS SELECT
     to_orig_v, 
     target_edge_length AS reach_length,
@@ -1518,12 +1527,15 @@ def fidimo_summarize( output,
     # Drop index on fidimo_distance (to_orig_v)
     fidimo_db.execute('''DROP INDEX IF EXISTS fidimo_distance_index_to_orig_v''')
 
+    print("Test1")
     fidimo_db.execute(
         '''ALTER TABLE summary_fidimo_result ADD COLUMN source_pop DOUBLE''')
     fidimo_db.execute('''UPDATE summary_fidimo_result SET
                   source_pop = (SELECT source_pop FROM fidimo_source_pop WHERE cat=summary_fidimo_result.to_orig_v)''')
     # Commit changes
     fidimo_database.commit()
+    
+    print("Test2")
 
     fidimo_db.execute(
         '''ALTER TABLE summary_fidimo_result ADD COLUMN rel_fidimo_result DOUBLE''')
@@ -1531,6 +1543,7 @@ def fidimo_summarize( output,
         '''ALTER TABLE summary_fidimo_result ADD COLUMN rel_fidimo_result_lwr DOUBLE''')
     fidimo_db.execute(
         '''ALTER TABLE summary_fidimo_result ADD COLUMN rel_fidimo_result_upr DOUBLE''')
+    print("Test3")
 
     fidimo_db.execute('''UPDATE summary_fidimo_result SET
                   rel_fidimo_result = fidimo_result/reach_length,
@@ -1556,24 +1569,25 @@ def fidimo_summarize( output,
         raise ValueError("Database driver of current mapset is not 'sqlite'.")
     mapset_database = sqlite3.connect(mapset_db_settings["database"])
     mapset_db = mapset_database.cursor()
-
+    
+    print("Update attribute table of output map")
     mapset_db.execute("ATTACH DATABASE ? AS fidimo_db", (fidimo_db_path,))
     mapset_db.execute('''UPDATE fidimo_output SET 
-                reach_length = (SELECT summary_fidimo_result.reach_length FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+                length = (SELECT summary_fidimo_result.reach_length FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
                   WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat),
                 source_pop = (SELECT summary_fidimo_result.source_pop FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
                   WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat),
-                fidimo_result = (SELECT summary_fidimo_result.fidimo_result FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+                fidimo = (SELECT summary_fidimo_result.fidimo_result FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
                   WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat), 
-                fidimo_result_lwr = (SELECT summary_fidimo_result.fidimo_result_lwr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+                fidimo_lwr = (SELECT summary_fidimo_result.fidimo_result_lwr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
                   WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat), 
-                fidimo_result_upr = (SELECT summary_fidimo_result.fidimo_result_upr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+                fidimo_upr = (SELECT summary_fidimo_result.fidimo_result_upr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
                   WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat),
-                rel_fidimo_result = (SELECT summary_fidimo_result.rel_fidimo_result FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+                rel = (SELECT summary_fidimo_result.rel_fidimo_result FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
                   WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat), 
-                rel_fidimo_result_lwr = (SELECT summary_fidimo_result.rel_fidimo_result_lwr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+                rel_lwr = (SELECT summary_fidimo_result.rel_fidimo_result_lwr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
                   WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat), 
-                rel_fidimo_result_upr = (SELECT summary_fidimo_result.rel_fidimo_result_upr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
+                rel_upr = (SELECT summary_fidimo_result.rel_fidimo_result_upr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
                   WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat);''')
     # Commit changes
     mapset_database.commit()
@@ -1698,7 +1712,7 @@ def main():
                          fidimo_db_path=fidimo_db_path)
 
         # Map fidimo result to display
-        fidimo_mapping(output)
+        #fidimo_mapping(output) # does not work yet
 
     return 0
 
