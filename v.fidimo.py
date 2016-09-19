@@ -1474,6 +1474,11 @@ def fidimo_realisation( realisation,
                     WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
         
     else:
+        # Get number of rows of fidimo_distance and chunk it into pieces of 10E5
+        fidimo_db.execute('''SELECT max(rowid) FROM fidimo_distance''')
+        smax_fidimo_distance_rowid = [x[0] for x in fidimo_db.fetchall()][0]
+        fidimo_distance_rowid_chunks = [[x+1,x + 10E5] for x in xrange(0, max_fidimo_distance_rowid, int(10E5))]
+      
         # Join fidimo_prob with fidimo_distance
         print("Update fidimo_distance with source-population-weighted fidimo probability...")
         for k in range(len(fidimo_distance_rowid_chunks)):
