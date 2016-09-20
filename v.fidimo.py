@@ -1202,9 +1202,11 @@ def fidimo_probability( fidimo_db_path,
             '''ALTER TABLE fidimo_distance ADD COLUMN basic_fidimo_prob_lwr DOUBLE''')
         fidimo_db.execute(
             '''ALTER TABLE fidimo_distance ADD COLUMN basic_fidimo_prob_upr DOUBLE''')
+    
     print("Test2")    
     # Before any calculations set fidimo_prob in fidimo_distance to ''
-    fidimo_db.execute(
+    else:
+        fidimo_db.execute(
         '''UPDATE fidimo_distance SET basic_fidimo_prob=NULL,basic_fidimo_prob_lwr=NULL,basic_fidimo_prob_upr=NULL;''')
     fidimo_database.commit()
     
@@ -1384,7 +1386,8 @@ def fidimo_realisation( realisation,
         
     # Before any calculations set fidimo_result in fidimo_distance to ''
     print("Test1")
-    fidimo_db.execute(
+    else:
+        fidimo_db.execute(
         '''UPDATE fidimo_distance SET fidimo_result=NULL,fidimo_result_lwr=NULL,fidimo_result_upr=NULL;''')
     fidimo_database.commit()
     print("Test2")
@@ -1476,7 +1479,7 @@ def fidimo_realisation( realisation,
     else:
         # Get number of rows of fidimo_distance and chunk it into pieces of 10E5
         fidimo_db.execute('''SELECT max(rowid) FROM fidimo_distance''')
-        smax_fidimo_distance_rowid = [x[0] for x in fidimo_db.fetchall()][0]
+        max_fidimo_distance_rowid = [x[0] for x in fidimo_db.fetchall()][0]
         fidimo_distance_rowid_chunks = [[x+1,x + 10E5] for x in xrange(0, max_fidimo_distance_rowid, int(10E5))]
       
         # Join fidimo_prob with fidimo_distance
