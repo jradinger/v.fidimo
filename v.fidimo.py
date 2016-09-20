@@ -1385,11 +1385,12 @@ def fidimo_realisation( realisation,
         fidimo_db.execute(
             '''ALTER TABLE fidimo_distance ADD COLUMN fidimo_result_upr DOUBLE''')
         
-    # Before any calculations set fidimo_result in fidimo_distance to ''
-    print("Test1")
     else:
+        # Before any calculations set fidimo_result in fidimo_distance to ''
+        print("Test1")
         fidimo_db.execute(
         '''UPDATE fidimo_distance SET fidimo_result=NULL,fidimo_result_lwr=NULL,fidimo_result_upr=NULL;''')
+    
     fidimo_database.commit()
     print("Test2")
     
