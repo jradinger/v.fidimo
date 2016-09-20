@@ -1203,11 +1203,12 @@ def fidimo_probability( fidimo_db_path,
         fidimo_db.execute(
             '''ALTER TABLE fidimo_distance ADD COLUMN basic_fidimo_prob_upr DOUBLE''')
     
-    print("Test2")    
-    # Before any calculations set fidimo_prob in fidimo_distance to ''
+            
     else:
-        fidimo_db.execute(
-        '''UPDATE fidimo_distance SET basic_fidimo_prob=NULL,basic_fidimo_prob_lwr=NULL,basic_fidimo_prob_upr=NULL;''')
+        print("Test2")
+        # Before any calculations set fidimo_prob in fidimo_distance to ''
+        fidimo_db.execute('''UPDATE fidimo_distance SET basic_fidimo_prob=NULL,basic_fidimo_prob_lwr=NULL,basic_fidimo_prob_upr=NULL;''')
+    
     fidimo_database.commit()
     
     # Delete fidimo_prob if exists
