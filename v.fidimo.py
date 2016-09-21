@@ -21,7 +21,7 @@
 #%end
 
 #%option G_OPT_F_INPUT
-#% key: fidimo_db_path
+#% key: fidimo_dir
 #% description: FIDIMO Database directory
 #% required: yes
 #%end
@@ -194,6 +194,7 @@
 
 import os
 import sys
+import shutil
 import atexit
 from grass.script import core as grass
 import math
@@ -297,7 +298,7 @@ def import_vector(input_map,  # input vector name
                       query_column="cat")
 
 
-def create_fidimo_db(fidimo_db_path):
+def create_fidimo_db(fidimo_dir):
     ''' Create FIDIMO DB'''
     
     # HERE a check if db already exists and launch an error if so and if overwrite flag is not set
@@ -305,28 +306,28 @@ def create_fidimo_db(fidimo_db_path):
     
     # If database exists it will be first removed
     try:
-        os.remove(fidimo_db_path)
+        shutil.rmtree(fidimo_dir)
     except OSError:
         pass
         
     #grass.message(_("Creating FIDIMO Database and copying edges and vertices"))
     print("Creating FIDIMO Database")
     
-    fidimo_database = sqlite3.connect(fidimo_db_path)
+    fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
     
     # Create table for meta data
     fidimo_db.execute(
         '''CREATE TABLE meta (parameter VARCHAR(45), value VARCHAR(300))''')
     fidimo_db.executemany("INSERT INTO meta (parameter) VALUES (?)",
-                          [(x,)for x in ["Fidimo DB", "Projection", "Network name", "Total reaches n",
+                          [(x,)for x in ["Fidimo directory", "Projection", "Network name", "Total reaches n",
                                          "Barriers n", "Source populations n", "Distance matrix created", "Source populations imported",
                                          "Fidimo probabilities calculated", "Last modified", "GRASS setup", "FIDIMO version",
                                          "Scipy version", "Numpy version", "igraph version"]])
     
     # Update metadata
     fidimo_db.execute(
-        '''UPDATE meta SET value=? WHERE parameter="Fidimo DB"''', (fidimo_db_path,))
+        '''UPDATE meta SET value=? WHERE parameter="Fidimo directory"''', (fidimo_dir,))
     fidimo_db.execute(
         '''UPDATE meta SET value=? WHERE parameter="FIDIMO version"''', (FIDIMO_version,))
     fidimo_db.execute(
@@ -345,11 +346,10 @@ def create_fidimo_db(fidimo_db_path):
 
 
 def fidimo_network(input,
-                   output,
                    strahler_col,
                    shreve_col,
                    network_col,
-                   fidimo_db_path,
+                   fidimo_dir,
                    barriers=None,
                    passability_col=None,
                    threshold=25):
@@ -550,60 +550,68 @@ def fidimo_network(input,
     # Copy final network to output map and adapt associated tables
     grass.run_command("v.extract",
                       quiet=quiet,
-                      overwrite=overwrite,
+                      overwrite=True,
                       flags="t",
                       input="fidimo_net3_tmp" + str(os.getpid()),
                       layer=3,
-                      output="output_tmp" + str(os.getpid()))
+                      output="output1_tmp" + str(os.getpid()))
     grass.run_command("v.category",
                       quiet=quiet,
                       overwrite=True,
                       input="output_tmp" + str(os.getpid()),
                       layer="3,1",
-                      output=output,
+                      output="output2_tmp" + str(os.getpid()),
                       option="chlayer")
     
     # Check if output table exists and remove if it exists
     tables_list = grass.read_command("db.tables", flags="p").splitlines()
-    if "fidimo_output" in tables_list:
+    if "output2_tmp" + str(os.getpid()) in tables_list:
         grass.run_command("db.droptable",
                           quiet=quiet,
                           flags="f",
-                          table="fidimo_output")
+                          table="output2_tmp" + str(os.getpid()))
         
     grass.run_command("db.copy",
                       quiet=quiet,
                       overwrite=True,
                       from_table="edges",
-                      to_table="fidimo_output")
+                      to_table="output2_tmp" + str(os.getpid()))
     
     grass.run_command("v.db.connect",
                       quiet=quiet,
                       overwrite=True,
-                      map=output,
+                      map="output2_tmp" + str(os.getpid()),
                       layer=1,
-                      table="fidimo_output")
+                      table="output2_tmp" + str(os.getpid()))
     
     output_columns = grass.read_command("db.columns",
-                                        table="fidimo_output").splitlines()
+                                        table="output2_tmp" + str(os.getpid())).splitlines()
     grass.run_command("v.db.dropcolumn",
                       quiet=quiet,
-                      map=output,
+                      map="output2_tmp" + str(os.getpid()),
                       layer=1,
                       columns=[x for x in output_columns if x not in ["cat", "orig_cat"]])
     grass.run_command("v.db.addcolumn",
                       quiet=quiet,
-                      map=output,
+                      map="output2_tmp" + str(os.getpid()),
                       layer=1,
                       columns='''length DOUBLE, source_pop DOUBLE, fidimo DOUBLE, fidimo_lwr DOUBLE, 
     fidimo_upr DOUBLE, rel DOUBLE, rel_lwr DOUBLE, rel_upr DOUBLE''')
+    
+    grass.run_command("v.out.ogr",
+                      quiet=quiet,
+                      overwrite=overwrite
+                      input="output2_tmp" + str(os.getpid()),
+                      output=os.path.join(fidimo_dir,"fidimo_network"),
+                      format="ESRI_Shapefile",
+                      output_layer="fidimo_output")
     
     #grass.message(_("Final networks prepared for FIDIMO"))
     print("Final networks prepared for FIDIMO")
     
     # Update metadata
     print("Update Metadata")
-    fidimo_database = sqlite3.connect(fidimo_db_path)
+    fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
     fidimo_db.execute(
         '''UPDATE meta SET value=? WHERE parameter="Network name"''', (input,))
@@ -622,26 +630,26 @@ def fidimo_network(input,
     fidimo_database.close()
 
 
-def set_fidimo_db(fidimo_db_path):
+def set_fidimo_db(fidimo_dir):
     ''' Create and tables for 
     vertices, edges, fidimo distance and barriers in Fidimo DB'''
     
     #grass.message(_("Creating FIDIMO Database and copying edges and vertices"))
     print("Copying edges and vertices to FIDIMO database")
     
-    fidimo_database = sqlite3.connect(fidimo_db_path)
+    fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
     
     # Copy edges and vertices to FIDIMO DB ####
     grass.run_command("db.copy",
                       overwrite=True,
                       from_table="vertices",
-                      to_database=fidimo_db_path,
+                      to_database=os.path.join(fidimo_dir,"fidimo_database.db"),
                       to_table="vertices")
     grass.run_command("db.copy",
                       overwrite=True,
                       from_table="edges",
-                      to_database=fidimo_db_path,
+                      to_database=os.path.join(fidimo_dir,"fidimo_database.db"),
                       to_table="edges")
     
     # Create fidimo_distance table
@@ -663,7 +671,7 @@ def set_fidimo_db(fidimo_db_path):
     fidimo_database.close()
 
 
-def add_midpoints_fidimo_db(fidimo_db_path):
+def add_midpoints_fidimo_db(fidimo_dir):
     '''Add midpoints (vertices) to each river reach to calculate
     distances between (midpoints of) river reaches.
     Each midpoint has its own id that is linked to the cat of the 
@@ -672,7 +680,7 @@ def add_midpoints_fidimo_db(fidimo_db_path):
     #grass.message(_("Add midpoints (vertices) for each river reach"))
     print("Add midpoints (vertices) for each river reach")
     
-    fidimo_database = sqlite3.connect(fidimo_db_path)
+    fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
     
     # Get midpoint vertices (reach id of grass edges) and insert in fidimo_db
@@ -726,7 +734,7 @@ def add_midpoints_fidimo_db(fidimo_db_path):
     fidimo_database.close()
 
 
-def fidimo_distance(fidimo_db_path,
+def fidimo_distance(fidimo_dir,
                     truncation=-1):
     '''This function fetches all vertices/edges from the
     corresponding tables of the fidimo database and builds
@@ -742,11 +750,11 @@ def fidimo_distance(fidimo_db_path,
     dispersal kernel probabilities '''
     
     # connect to database
-    fidimo_database = sqlite3.connect(fidimo_db_path)
+    fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
     
     # Add midpoints to calculate distance between single river reaches
-    add_midpoints_fidimo_db(fidimo_db_path)
+    add_midpoints_fidimo_db(fidimo_dir)
     
     # Set distance threshold
     if int(truncation) < 0:
@@ -1029,12 +1037,12 @@ def fidimo_kernel_cdf(x, sigma_stat, sigma_mob, p):
 
 
 def fidimo_source_pop( source_pop_csv,
-                       fidimo_db_path,
+                       fidimo_dir,
                        realisation):
-    '''This function appends source populations to distance matrix and creates output map'''
+    '''This function appends source populations to distance matrix'''
     
     # connect to database
-    fidimo_database = sqlite3.connect(fidimo_db_path)
+    fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
     
     # Delete fidimo_source_pop if exists
@@ -1165,7 +1173,7 @@ def fidimo_source_pop( source_pop_csv,
     fidimo_database.close()
 
 
-def fidimo_probability( fidimo_db_path,
+def fidimo_probability( fidimo_dir,
                         sigma_dict,
                         p,
                         statistical_interval):
@@ -1173,7 +1181,7 @@ def fidimo_probability( fidimo_db_path,
     for each river reach and corresponding distances between reaches'''
     
     # connect to database
-    fidimo_database = sqlite3.connect(fidimo_db_path)
+    fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
     
     # Get stream orders (ASC) of source populations where source_pop > 0
@@ -1365,13 +1373,13 @@ def fidimo_probability( fidimo_db_path,
 
 def fidimo_realisation( realisation,
                         statistical_interval,
-                        fidimo_db_path):
+                        fidimo_dir):
     '''This function either weights the fidimo probabilities with the value of the value of
     the source population or calculates realised fish count (real integer values) from the
     probabilities using the multinomial distribution'''
     
     # connect to database
-    fidimo_database = sqlite3.connect(fidimo_db_path)
+    fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
     
     # First check if fidimo_result already exists in fidimo distance and
@@ -1507,12 +1515,12 @@ def fidimo_realisation( realisation,
 
 
 def fidimo_summarize( output,
-                      fidimo_db_path):
+                      fidimo_dir):
     '''This function summarizes the fidimo result for each target reach
     and writes results back to output vector map'''
 
     # connect to database
-    fidimo_database = sqlite3.connect(fidimo_db_path)
+    fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
 
     # First, delete summary_fidimo_prob if exists
@@ -1566,9 +1574,16 @@ def fidimo_summarize( output,
 
     # Commit changes
     fidimo_database.commit()
-
     # Close database connection
     fidimo_database.close()
+    
+    # Import network map from fidimo_dir
+    grass.run_command("v.in.ogr",
+                      quiet=quiet,
+                      overwrite=overwrite
+                      input=os.path.join(fidimo_dir,"fidimo_network/fidimo_network.shp"),
+                      output=output,
+                      key="cat")
 
     # Attach fidimo results to attribute table of output map
     # database-connection of current mapset
@@ -1581,24 +1596,24 @@ def fidimo_summarize( output,
     mapset_db = mapset_database.cursor()
     
     print("Update attribute table of output map")
-    mapset_db.execute("ATTACH DATABASE ? AS fidimo_db", (fidimo_db_path,))
-    mapset_db.execute('''UPDATE fidimo_output SET 
+    mapset_db.execute("ATTACH DATABASE ? AS fidimo_db", (os.path.join(fidimo_dir,"fidimo_database.db"),))
+    mapset_db.execute('''UPDATE {output} SET 
                 length = (SELECT summary_fidimo_result.reach_length FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
-                  WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat),
+                  WHERE summary_fidimo_result.to_orig_v={output}.cat),
                 source_pop = (SELECT summary_fidimo_result.source_pop FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
-                  WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat),
+                  WHERE summary_fidimo_result.to_orig_v={output}.cat),
                 fidimo = (SELECT summary_fidimo_result.fidimo_result FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
-                  WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat), 
+                  WHERE summary_fidimo_result.to_orig_v={output}.cat), 
                 fidimo_lwr = (SELECT summary_fidimo_result.fidimo_result_lwr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
-                  WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat), 
+                  WHERE summary_fidimo_result.to_orig_v={output}.cat), 
                 fidimo_upr = (SELECT summary_fidimo_result.fidimo_result_upr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
-                  WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat),
+                  WHERE summary_fidimo_result.to_orig_v={output}.cat),
                 rel = (SELECT summary_fidimo_result.rel_fidimo_result FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
-                  WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat), 
+                  WHERE summary_fidimo_result.to_orig_v={output}.cat), 
                 rel_lwr = (SELECT summary_fidimo_result.rel_fidimo_result_lwr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
-                  WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat), 
+                  WHERE summary_fidimo_result.to_orig_v={output}.cat), 
                 rel_upr = (SELECT summary_fidimo_result.rel_fidimo_result_upr FROM fidimo_db.summary_fidimo_result summary_fidimo_result 
-                  WHERE summary_fidimo_result.to_orig_v=fidimo_output.cat);''')
+                  WHERE summary_fidimo_result.to_orig_v={output}.cat);'''.format(output=output))
     # Commit changes
     mapset_database.commit()
     # Close database connection
@@ -1617,11 +1632,11 @@ def fidimo_mapping(output):
     # map=output)
 
 
-def print_metadata(fidimo_db_path):
+def print_metadata(fidimo_dir):
     ''' Print out metadata of FIDIMO database defined
-    in fidimo_db_path'''
+    in fidimo_dir'''
 
-    fidimo_database = sqlite3.connect(fidimo_db_path)
+    fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
 
     # Fetch meta data
@@ -1646,7 +1661,7 @@ def main():
     shreve_col = options['shreve_col']
     network_col = options['network_col']
     barriers = options['barriers']
-    fidimo_db_path = options['fidimo_db_path']
+    fidimo_dir = options['fidimo_dir']
     passability_col = options['passability_col']
     threshold = options['threshold']
     truncation = options['truncation']
@@ -1667,12 +1682,12 @@ def main():
     ############ Start with FIDIMO modules ##############
     # Print out Metadata and exit main function
     if flags['m']:
-        print_metadata(fidimo_db_path=options['fidimo_db_path'])
+        print_metadata(fidimo_dir=options['fidimo_dir'])
         return None
 
     if not (flags['s'] or flags['f']):
         # Set up fidimo_db
-        create_fidimo_db(fidimo_db_path=fidimo_db_path)
+        create_fidimo_db(fidimo_dir=fidimo_dir)
 
         # Create fidimo network from input data (river shape, barrier points)
         fidimo_network(input=input,
@@ -1681,21 +1696,21 @@ def main():
                        shreve_col=shreve_col,
                        network_col=network_col,
                        barriers=barriers,
-                       fidimo_db_path=fidimo_db_path,
+                       fidimo_dir=fidimo_dir,
                        passability_col=passability_col,
                        threshold=threshold)
 
         # Copying edges and vertices etc to fidimo_db
-        set_fidimo_db(fidimo_db_path=fidimo_db_path)
+        set_fidimo_db(fidimo_dir=fidimo_dir)
 
         # Calculate distance between single river reaches
-        fidimo_distance(fidimo_db_path=fidimo_db_path,
+        fidimo_distance(fidimo_dir=fidimo_dir,
                         truncation=truncation)
 
     if not (flags['n'] or flags['f']):
         # Append source populations
         fidimo_source_pop(source_pop_csv=source_pop_csv,
-                          fidimo_db_path=fidimo_db_path,
+                          fidimo_dir=fidimo_dir,
                           realisation=flags['r'])
 
     if not (flags['n'] or flags['s']):
@@ -1706,7 +1721,7 @@ def main():
                                     statistical_interval=statistical_interval,
                                     seed_fishmove=seed_fishmove)
         # Calcuate fidimo probability
-        fidimo_probability(fidimo_db_path=fidimo_db_path,
+        fidimo_probability(fidimo_dir=fidimo_dir,
                            sigma_dict=my_sigma_dict,
                            p=0.67,
                            statistical_interval=statistical_interval)
@@ -1715,11 +1730,11 @@ def main():
         # population
         fidimo_realisation( realisation=flags['r'],
                             statistical_interval=statistical_interval,
-                            fidimo_db_path=fidimo_db_path)
+                            fidimo_dir=fidimo_dir)
 
         # Get sum of fidimo results for each target reach
         fidimo_summarize(output=output,
-                         fidimo_db_path=fidimo_db_path)
+                         fidimo_dir=fidimo_dir)
 
         # Map fidimo result to display
         #fidimo_mapping(output) # does not work yet
