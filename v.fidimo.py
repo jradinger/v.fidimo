@@ -600,7 +600,7 @@ def fidimo_network(input,
     
     grass.run_command("v.out.ogr",
                       quiet=quiet,
-                      overwrite=overwrite
+                      overwrite=overwrite,
                       input="output2_tmp" + str(os.getpid()),
                       output=os.path.join(fidimo_dir,"fidimo_network"),
                       format="ESRI_Shapefile",
@@ -1580,7 +1580,7 @@ def fidimo_summarize( output,
     # Import network map from fidimo_dir
     grass.run_command("v.in.ogr",
                       quiet=quiet,
-                      overwrite=overwrite
+                      overwrite=overwrite,
                       input=os.path.join(fidimo_dir,"fidimo_network/fidimo_network.shp"),
                       output=output,
                       key="cat")
