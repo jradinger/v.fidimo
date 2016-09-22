@@ -304,7 +304,7 @@ def create_fidimo_db( fidimo_dir,
      
     # If fidimo_dir exists it will be first removed
     if os.path.exists(fidimo_dir):
-        if overwrite==True:
+        if grass.overwrite()==True:
             shutil.rmtree(fidimo_dir)
             print("FIDIMO dir already exists and will be overwritten")
         else:
