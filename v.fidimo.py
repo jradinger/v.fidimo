@@ -604,7 +604,7 @@ def fidimo_network(input,
                       input="output2_tmp" + str(os.getpid()),
                       output=os.path.join(fidimo_dir,"fidimo_network"),
                       format="ESRI_Shapefile",
-                      output_layer="fidimo_output")
+                      output_layer="fidimo_network")
     
     #grass.message(_("Final networks prepared for FIDIMO"))
     print("Final networks prepared for FIDIMO")
