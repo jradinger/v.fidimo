@@ -300,15 +300,16 @@ def import_vector(input_map,  # input vector name
 
 def create_fidimo_db(fidimo_dir):
     ''' Create FIDIMO DB'''
+     
+    # If fidimo_dir exists it will be first removed
+    if os.path.exists(fidimo_dir):
+        if overwrite:
+            shutil.rmtree(fidimo_dir)
+            print("FIDIMO dir already exists and will be overwritten")
+        else:
+            raise ValueError("FIDIMO directory already exists. Please use overwrite-flag to overwrite the existing FIDIMO directory")
     
-    # HERE a check if db already exists and launch an error if so and if overwrite flag is not set
-    ########
-    
-    # If database exists it will be first removed
-    try:
-        shutil.rmtree(fidimo_dir)
-    except OSError:
-        pass
+    os.makedirs(fidimo_dir)
         
     #grass.message(_("Creating FIDIMO Database and copying edges and vertices"))
     print("Creating FIDIMO Database")
