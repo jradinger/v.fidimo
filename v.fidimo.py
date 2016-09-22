@@ -298,12 +298,13 @@ def import_vector(input_map,  # input vector name
                       query_column="cat")
 
 
-def create_fidimo_db(fidimo_dir):
+def create_fidimo_db( fidimo_dir,
+                      overwrite=overwrite):
     ''' Create FIDIMO DB'''
      
     # If fidimo_dir exists it will be first removed
     if os.path.exists(fidimo_dir):
-        if overwrite:
+        if overwrite==True:
             shutil.rmtree(fidimo_dir)
             print("FIDIMO dir already exists and will be overwritten")
         else:
