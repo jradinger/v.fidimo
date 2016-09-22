@@ -298,8 +298,7 @@ def import_vector(input_map,  # input vector name
                       query_column="cat")
 
 
-def create_fidimo_db( fidimo_dir,
-                      overwrite=overwrite):
+def create_fidimo_db( fidimo_dir):
     ''' Create FIDIMO DB'''
      
     # If fidimo_dir exists it will be first removed
@@ -560,7 +559,7 @@ def fidimo_network(input,
     grass.run_command("v.category",
                       quiet=quiet,
                       overwrite=True,
-                      input="output_tmp" + str(os.getpid()),
+                      input="output1_tmp" + str(os.getpid()),
                       layer="3,1",
                       output="output2_tmp" + str(os.getpid()),
                       option="chlayer")
