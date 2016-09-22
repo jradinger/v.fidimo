@@ -1692,7 +1692,6 @@ def main():
 
         # Create fidimo network from input data (river shape, barrier points)
         fidimo_network(input=input,
-                       output=output,
                        strahler_col=strahler_col,
                        shreve_col=shreve_col,
                        network_col=network_col,
