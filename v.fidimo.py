@@ -806,20 +806,23 @@ def fidimo_distance(fidimo_dir,
         
         # Create chunks for memory-saving processing        
         chunk_size_midpoints = int(100 * round(float(10E6/len(midpoints))/100))
-        g_midpoints_chunks = [g_midpoints[x:x + chunk_size_midpoints]
-                              for x in xrange(0, len(g_midpoints), chunk_size_midpoints)]
+        midpoints_chunks = [midpoints[x:x + chunk_size_midpoints]
+                              for x in xrange(0, len(midpoints), chunk_size_midpoints)]
            
         # Calculate shortest pathss
         #grass.message(_("Calculating shortest paths"))
         print("Calculating shortest paths (chunk size: "+str(chunk_size_midpoints)+")...")
                                       
-        for k in range(len(g_midpoints_chunks)):
-            print("...chunk: "+str(k+1)+" of "+str(len(g_midpoints_chunks)))
-            distance_mat_upstream = g.shortest_paths(source=g_midpoints_chunks[k],
+        for k in range(len(midpoints_chunks)):
+            print("...chunk: "+str(k+1)+" of "+str(len(midpoints_chunks)))
+            
+            g_midpoints_chunk_k = [vertices_dict[x] for x in midpoints_chunks[k]]
+            
+            distance_mat_upstream = g.shortest_paths(source=g_midpoints_chunk_k,
                                                      target=g_midpoints, weights="half_length", mode="IN")
-            distance_mat_downstream = g.shortest_paths(source=g_midpoints_chunks[k],
+            distance_mat_downstream = g.shortest_paths(source=g_midpoints_chunk_k,
                                                        target=g_midpoints, weights="half_length", mode="OUT")
-            distance_mat_all = g.shortest_paths(source=g_midpoints_chunks[k],
+            distance_mat_all = g.shortest_paths(source=g_midpoints_chunk_k,
                                                 target=g_midpoints, weights="half_length", mode="ALL")
             
             # Distinguish between paths up- and downstream [1: downstream, 2:upstream, 3:neither (down-up combination), 4: both directions (e.g. where source=target and dist=0)
@@ -841,14 +844,14 @@ def fidimo_distance(fidimo_dir,
             
             #grass.message(_("Updating distance matrix for specific network"))
             print("Updating distance matrix for specific network and chunk - part 1")
-            paths_to_db = numpy.array([[x for item in g_midpoints_chunks[k] for x in repeat(item, len(midpoints))],  # list of all source/from midpoints of reaches
+            paths_to_db = numpy.array([[x for item in midpoints_chunks[k] for x in repeat(item, len(midpoints))],  # list of all source/from midpoints of reaches
                               # list of all target/to midpoints of reaches
-                              midpoints * len(g_midpoints_chunks[k]),
+                              midpoints * len(midpoints_chunks[k]),
                               # list of distances
                               [item for sublist in distance_mat_all for item in sublist],
                               # list of directions
                               [item for sublist in direction_mat for item in sublist],
-                              [i] * (len(midpoints)*len(g_midpoints_chunks[k]))])  # network
+                              [i] * (len(midpoints)*len(midpoints_chunks[k]))])  # network
             
             # Only select those network connection that are below the threshold distance
             paths_to_db = zip(*paths_to_db[:,paths_to_db[2,:]<max_dist])
