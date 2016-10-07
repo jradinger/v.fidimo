@@ -1157,7 +1157,7 @@ def fidimo_source_pop( source_pop_csv,
     
     # Join table fidimo_distance with fidimo_source_pop
     #grass.message(_("Updating source population in fidimo_distance"))
-    print("Updating source population in fidimo_distance")
+    print("Updating %s source populations in fidimo_distance" %(str(n_source_pop)))
     for k in range(len(fidimo_distance_rowid_chunks)):
         print("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))) 
         fidimo_db.execute('''UPDATE fidimo_distance SET 
@@ -1690,8 +1690,8 @@ def main():
     ############ DEFINITION CLEANUP TEMPORARY FILES ##############
     # global variables for cleanup
     global tmp_map_vect
-    tmp_map_vect = ['streams_tmp', 'barriers_tmp', 'fidimo_net1_tmp',
-                    'fidimo_net2_tmp', 'fidimo_net3_tmp', 'output_tmp']
+    tmp_map_vect = ['streams_tmp', 'barriers_tmp', 'fidimo_net1_tmp','fidimo_net2_tmp','fidimo_net3_tmp',
+                    'output1_tmp','output2_tmp']
 
     ############ Start with FIDIMO modules ##############
     # Print out Metadata and exit main function
