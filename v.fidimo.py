@@ -1526,6 +1526,9 @@ def fidimo_summarize( output,
                       fidimo_dir):
     '''This function summarizes the fidimo result for each target reach
     and writes results back to output vector map'''
+    
+    grass.message(_("FIDIMO summarize"))
+    
     time_fidimo_summarize1 = timer()
 
     # connect to database
