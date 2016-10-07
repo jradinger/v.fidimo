@@ -1039,6 +1039,17 @@ def fidimo_source_pop( source_pop_csv,
     # connect to database
     fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
+    
+    # Check if FIDIMO DB already contains source populations and check for overwrite flag
+    fidimo_db.execute('''SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='fidimo_source_pop';''')
+    if sum([x[0] for x in fidimo_db.fetchall()])==1:
+        if grass.overwrite()==True:
+            # Delete source populations if exists
+            fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_source_pop_tmp''')
+            fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_source_pop''')
+            grass.warning(_("FIDIMO database already contains source populations which will be overwritten"))
+        else:
+            raise ValueError("FIDIMO database already contains source populations. Please use overwrite-flag to overwrite the existing source populations")
        
     # Read CSV and check if three columns (reach cat, source_col, p)
     with open(source_pop_csv,'rb') as csv_file:
@@ -1076,10 +1087,7 @@ def fidimo_source_pop( source_pop_csv,
         grass.verbose(_(
             "IDs (categories, cat) of source populations match cats of vector input map that has been used for calculating fidimo distance matrix"))
  
-     # Delete fidimo_source_pop if exists
-    fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_source_pop_tmp''')
-    fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_source_pop''')
-    
+   
     fidimo_db.execute("CREATE TABLE fidimo_source_pop_tmp (cat, source_pop, p);")
  
     # Insert source populations into a tmp table          
