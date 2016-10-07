@@ -235,10 +235,6 @@ if grass.verbosity() > 2:
 ############# Define Cleanup ##############
 ###########################################
 
-
-tmp_map_vect = None
-
-
 def cleanup():
     if tmp_map_vect and not flags['k']:
         grass.run_command("g.remove",
@@ -603,6 +599,10 @@ def fidimo_network(input,
                       output_layer="fidimo_network")
     
     grass.message(_("Final networks prepared for FIDIMO"))
+    
+    # Update files to remove at cleanup
+    tmp_map_vect = tmp_map_vect.extend(['streams_tmp', 'barriers_tmp', 'fidimo_net1_tmp','fidimo_net2_tmp','fidimo_net3_tmp',
+                    'output1_tmp','output2_tmp'])
     
     # Update metadata
     grass.verbose(_("Updating Metadata"))
@@ -1693,8 +1693,7 @@ def main():
     ############ DEFINITION CLEANUP TEMPORARY FILES ##############
     # global variables for cleanup
     global tmp_map_vect
-    tmp_map_vect = ['streams_tmp', 'barriers_tmp', 'fidimo_net1_tmp','fidimo_net2_tmp','fidimo_net3_tmp',
-                    'output1_tmp','output2_tmp']
+    tmp_map_vect = []
 
     ############ Start with FIDIMO modules ##############
     # Print out Metadata and exit main function
