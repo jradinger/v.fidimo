@@ -267,8 +267,7 @@ def import_vector(input_map,  # input vector name
                                      table=output_map).splitlines()
     
     if sum([x not in old_columns for x in columns.values()]) > 0:
-        #grass.fatal(_("At least one specified column does not exist in input map"))
-        raise ValueError(
+        grass.fatal(
             "At least one specified column does not exist in input map")
         
     if sorted(columns.values() + ["cat"]) == sorted(old_columns):
@@ -306,7 +305,7 @@ def create_fidimo_db( fidimo_dir):
             shutil.rmtree(fidimo_dir)
             grass.warning(_("FIDIMO dir already exists and will be overwritten"))
         else:
-            raise ValueError("FIDIMO directory already exists. Please use overwrite-flag to overwrite the existing FIDIMO directory")
+            grass.fatal("FIDIMO directory already exists. Please use overwrite-flag to overwrite the existing FIDIMO directory")
     
     os.makedirs(fidimo_dir)
         
@@ -463,7 +462,7 @@ def fidimo_network(input,
                                                                         flags="p").splitlines())
     if mapset_db_settings["driver"] != "sqlite":
         #grass.fatal(_("Database driver of current mapset is not 'sqlite'."))
-        raise ValueError("Database driver of current mapset is not 'sqlite'.")
+        grass.fatal("Database driver of current mapset is not 'sqlite'.")
     mapset_database = sqlite3.connect(mapset_db_settings["database"])
     mapset_db = mapset_database.cursor()
     
@@ -1062,17 +1061,17 @@ def fidimo_source_pop( source_pop_csv,
     # Check if source pop and p are within a valid range
     n_source_pop = sum([i[1]>0 for i in source_pop_csv_read_to_db])
     if n_source_pop==0:
-        raise ValueError(
+        grass.fatal(
             "Source population csv contains no source populations > 0")
         
     p_fidimo_source_pop_tmp = [i[2] for i in source_pop_csv_read_to_db]
     if (min(p_fidimo_source_pop_tmp)<0) or (max(p_fidimo_source_pop_tmp)>1):
-        raise ValueError(
+        grass.fatal(
             "Values for p must be decimal numbers between 0 and 1. NAs not allowed")
         
     source_pop_fidimo_source_pop_tmp = [i[1] for i in source_pop_csv_read_to_db]
     if min(source_pop_fidimo_source_pop_tmp)<0:
-        raise ValueError(
+        grass.fatal(
             "Values for source populations must be positive integer or decimal numbers. NAs not allowed")
     
     # check if cats of fidimo_source_pop_tmp == orig_cat of edges
@@ -1081,7 +1080,7 @@ def fidimo_source_pop( source_pop_csv,
     cat_fidimo_source_pop_tmp = [i[0] for i in source_pop_csv_read_to_db]
     if sorted(orig_cat_edges) != sorted(cat_fidimo_source_pop_tmp):
         #grass.fatal(_("Vector input map of source populations must must match vector input map that has been used for calculating fidimo distance matrix"))
-        raise ValueError(
+        grass.fatal(
             "IDs (categories, cat) of source populations must must match cats of vector input map that has been used for calculating fidimo distance matrix")
     else:
         grass.verbose(_(
@@ -1195,11 +1194,10 @@ def fidimo_probability( fidimo_dir,
     grass.debug(_("Test 0 fidimo_probability"),1)
     
     if None in so_list:
-        raise ValueError(
+        grass.fatal(
             "At least one stream reach with a source population has no value for Strahler stream order")
     elif max([int(x) for x in so_list]) > 9:
-        #grass.fatal(_("Stream network has stream orders > 9. Please consider smaller stream network"))
-        raise ValueError(
+        grass.fatal(
             "Stream network has stream orders > 9. Please consider smaller stream network")
     else:
         so_list = [int(x) for x in so_list]
@@ -1603,8 +1601,7 @@ def fidimo_summarize( output,
     mapset_db_settings = dict(x.split(": ") for x in grass.read_command("db.connect",
                                                                         flags="p").splitlines())
     if mapset_db_settings["driver"] != "sqlite":
-        #grass.fatal(_("Database driver of current mapset is not 'sqlite'."))
-        raise ValueError("Database driver of current mapset is not 'sqlite'.")
+        grass.fatal("Database driver of current mapset is not 'sqlite'.")
     mapset_database = sqlite3.connect(mapset_db_settings["database"])
     mapset_db = mapset_database.cursor()
     
