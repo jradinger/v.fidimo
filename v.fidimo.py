@@ -1182,6 +1182,8 @@ def fidimo_probability( fidimo_dir,
     '''This function calculates dispersal kernel probabilities
     for each river reach and corresponding distances between reaches'''
     
+    grass.message(_("Calculation of FIDIMO probablities based on species-specific dispersal parameters"))
+    
     # connect to database
     fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
