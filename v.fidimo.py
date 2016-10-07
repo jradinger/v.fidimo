@@ -1545,7 +1545,7 @@ def fidimo_summarize( output,
     CAST(SUM(fidimo_result) AS DOUBLE) AS fidimo_result, 
     CAST(SUM(fidimo_result_lwr) AS DOUBLE) AS fidimo_result_lwr,
     CAST(SUM(fidimo_result_upr) AS DOUBLE) AS fidimo_result_upr 
-    FROM fidimo_distance GROUP BY to_orig_v;''')
+    FROM fidimo_distance WHERE direction!=3 GROUP BY to_orig_v;''')
 
     # Drop index on fidimo_distance (to_orig_v)
     fidimo_db.execute('''DROP INDEX IF EXISTS fidimo_distance_index_to_orig_v''')
@@ -1629,7 +1629,7 @@ def fidimo_summarize( output,
     time_fidimo_summarize3 = timer()
    
     #grass.message(_("Time elapsed: %s" %str(end-start)))
-    print("Time for fidimo_summarize : %s and %s" % (str(time_fidimo_summarize3 - time_fidimo_summarize1),
+    print("Time for fidimo_summarize : %s and %s" % (str(time_fidimo_summarize2 - time_fidimo_summarize1),
       str(time_fidimo_summarize3 - time_fidimo_summarize1)))
 
 
