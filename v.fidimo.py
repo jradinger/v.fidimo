@@ -1629,8 +1629,8 @@ def fidimo_summarize( output,
     time_fidimo_summarize3 = timer()
    
     #grass.message(_("Time elapsed: %s" %str(end-start)))
-    print("Time for fidimo_summarize : %s and %s" % (str(time_fidimo_summarize1 - time_fidimo_summarize2),
-      str(time_fidimo_summarize1 - time_fidimo_summarize3)))
+    print("Time for fidimo_summarize : %s and %s" % (str(time_fidimo_summarize3 - time_fidimo_summarize1),
+      str(time_fidimo_summarize3 - time_fidimo_summarize1)))
 
 
 
