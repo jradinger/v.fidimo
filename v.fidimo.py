@@ -1049,7 +1049,7 @@ def fidimo_source_pop( source_pop_csv,
             fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_source_pop''')
             grass.warning(_("FIDIMO database already contains source populations which will be overwritten"))
         else:
-            raise ValueError("FIDIMO database already contains source populations. Please use overwrite-flag to overwrite the existing source populations")
+            grass.fatal_error("FIDIMO database already contains source populations. Please use overwrite-flag to overwrite the existing source populations")
        
     # Read CSV and check if three columns (reach cat, source_col, p)
     with open(source_pop_csv,'rb') as csv_file:
