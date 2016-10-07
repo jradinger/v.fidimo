@@ -658,7 +658,7 @@ def set_fidimo_db(fidimo_dir):
         '''CREATE TABLE barriers_along (source INTEGER, target INTEGER, barrier INTEGER)''')
     
     # Update metadata
-    grass.verbose(_("Update Metadata"))
+    grass.verbose(_("Updating Metadata"))
     fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Last modified"''',
                       (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
     
@@ -1157,7 +1157,7 @@ def fidimo_source_pop( source_pop_csv,
         fidimo_database.commit()
     
     # Update metadata
-    grass.verbose(_"Updating Metadata"))
+    grass.verbose(_("Updating Metadata"))
     fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Source populations n"''',(str(n_source_pop),))
     fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Source populations imported"''',
                       (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
@@ -1627,8 +1627,8 @@ def fidimo_summarize( output,
     time_fidimo_summarize3 = timer()
    
     #grass.message(_("Time elapsed: %s" %str(end-start)))
-    grass.verbose("Time for fidimo_summarize : %s and %s" % (str(time_fidimo_summarize2 - time_fidimo_summarize1),
-      str(time_fidimo_summarize3 - time_fidimo_summarize1)))
+    grass.verbose(_("Time for fidimo_summarize : %s and %s" % (str(time_fidimo_summarize2 - time_fidimo_summarize1),
+      str(time_fidimo_summarize3 - time_fidimo_summarize1))))
 
 
 
