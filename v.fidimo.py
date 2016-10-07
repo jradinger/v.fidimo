@@ -1062,6 +1062,11 @@ def fidimo_source_pop( source_pop_csv,
         # csv to list of tuples for input into db
         source_pop_csv_read_to_db = [(int(i['cat']), float(i['source_pop']), float(i['p'])) for i in source_pop_csv_read]
   
+    n_source_pop = sum([i[1]>0 for i in source_pop_csv_read_to_db])
+    if n_source_pop==0:
+        raise ValueError(
+            "Source population csv contains no source populations > 0")
+                
     fidimo_db.executemany("INSERT INTO fidimo_source_pop_tmp (cat, source_pop, p) VALUES (?, ?, ?);", source_pop_csv_read_to_db)
     fidimo_database.commit()
     
@@ -1163,10 +1168,7 @@ def fidimo_source_pop( source_pop_csv,
     
     # Update metadata
     print("Update Metadata")
-    fidimo_db.execute(
-        'SELECT COUNT(*) FROM fidimo_source_pop WHERE source_pop>0')
-    fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Source populations n"''', (str(
-        [x[0] for x in fidimo_db.fetchall()][0]),))
+    fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Source populations n"''',(str(n_source_pop),))
     fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Source populations imported"''',
                       (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
     fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Last modified"''',
@@ -1189,7 +1191,7 @@ def fidimo_probability( fidimo_dir,
     
     # Get stream orders (ASC) of source populations where source_pop > 0
     fidimo_db.execute(
-        '''SELECT DISTINCT source_strahler FROM fidimo_distance WHERE source_pop > 0''')
+        '''SELECT DISTINCT source_strahler FROM fidimo_distance WHERE source_pop > 0;''')
     so_list = sorted([x[0] for x in fidimo_db.fetchall()])
     print("Test0")
     if None in so_list:
@@ -1521,6 +1523,7 @@ def fidimo_summarize( output,
                       fidimo_dir):
     '''This function summarizes the fidimo result for each target reach
     and writes results back to output vector map'''
+    time_fidimo_summarize1 = timer()
 
     # connect to database
     fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
@@ -1580,6 +1583,8 @@ def fidimo_summarize( output,
     # Close database connection
     fidimo_database.close()
     
+    time_fidimo_summarize2 = timer()
+    
     # Import network map from fidimo_dir
     grass.run_command("v.in.ogr",
                       quiet=quiet,
@@ -1621,6 +1626,13 @@ def fidimo_summarize( output,
     mapset_database.commit()
     # Close database connection
     mapset_database.close()
+    
+    time_fidimo_summarize3 = timer()
+   
+    #grass.message(_("Time elapsed: %s" %str(end-start)))
+    print("Time for fidimo_summarize : %s and %s" % (str(time_fidimo_summarize1 - time_fidimo_summarize2),
+      str(time_fidimo_summarize1 - time_fidimo_summarize3)))
+
 
 
 def fidimo_mapping(output):
