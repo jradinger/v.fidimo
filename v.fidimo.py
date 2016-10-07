@@ -1157,7 +1157,7 @@ def fidimo_source_pop( source_pop_csv,
     
     # Join table fidimo_distance with fidimo_source_pop
     #grass.message(_("Updating source population in fidimo_distance"))
-    print("Updating %s source populations in fidimo_distance" %(str(n_source_pop)))
+    grass.message(_("Updating %s source populations in fidimo_distance" %(str(n_source_pop))))
     for k in range(len(fidimo_distance_rowid_chunks)):
         print("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))) 
         fidimo_db.execute('''UPDATE fidimo_distance SET 
