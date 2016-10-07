@@ -1047,13 +1047,7 @@ def fidimo_source_pop( source_pop_csv,
     # connect to database
     fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
-    
-    # Delete fidimo_source_pop if exists
-    fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_source_pop_tmp''')
-    fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_source_pop''')
-    
-    fidimo_db.execute("CREATE TABLE fidimo_source_pop_tmp (cat, source_pop, p);")
-    
+       
     # Read CSV and check if three columns (reach cat, source_col, p)
     with open(source_pop_csv,'rb') as csv_file:
         source_pop_csv_read = csv.DictReader(csv_file,fieldnames=("cat", "source_pop", "p")) # comma is default delimiter,header is assumed 
@@ -1062,34 +1056,26 @@ def fidimo_source_pop( source_pop_csv,
         # csv to list of tuples for input into db
         source_pop_csv_read_to_db = [(int(i['cat']), float(i['source_pop']), float(i['p'])) for i in source_pop_csv_read]
   
+    # Check if source pop and p are within a valid range
     n_source_pop = sum([i[1]>0 for i in source_pop_csv_read_to_db])
     if n_source_pop==0:
         raise ValueError(
             "Source population csv contains no source populations > 0")
-                
-    fidimo_db.executemany("INSERT INTO fidimo_source_pop_tmp (cat, source_pop, p) VALUES (?, ?, ?);", source_pop_csv_read_to_db)
-    fidimo_database.commit()
-    
-    fidimo_db.execute(
-        '''CREATE INDEX fidimo_source_pop_tmp_index ON fidimo_source_pop_tmp (cat)''')
-    
-    # Check if source pop and p are within a valid range
-    fidimo_db.execute('SELECT DISTINCT p FROM fidimo_source_pop_tmp')
-    p_fidimo_source_pop_tmp = [x[0] for x in fidimo_db.fetchall()]
+        
+    p_fidimo_source_pop_tmp = [i[2] for i in source_pop_csv_read_to_db]
     if (min(p_fidimo_source_pop_tmp)<0) or (max(p_fidimo_source_pop_tmp)>1):
         raise ValueError(
             "Values for p must be decimal numbers between 0 and 1. NAs not allowed")
-    fidimo_db.execute('SELECT DISTINCT source_pop FROM fidimo_source_pop_tmp')
-    source_pop_fidimo_source_pop_tmp = [x[0] for x in fidimo_db.fetchall()]
+        
+    source_pop_fidimo_source_pop_tmp = [i[1] for i in source_pop_csv_read_to_db]
     if min(source_pop_fidimo_source_pop_tmp)<0:
         raise ValueError(
             "Values for source populations must be positive integer or decimal numbers. NAs not allowed")
-        
+    
     # check if cats of fidimo_source_pop_tmp == orig_cat of edges
     fidimo_db.execute('SELECT DISTINCT orig_cat FROM edges')
     orig_cat_edges = [x[0] for x in fidimo_db.fetchall()]
-    fidimo_db.execute('SELECT DISTINCT cat FROM fidimo_source_pop_tmp')
-    cat_fidimo_source_pop_tmp = [x[0] for x in fidimo_db.fetchall()]
+    cat_fidimo_source_pop_tmp = [i[0] for i in source_pop_csv_read_to_db]
     if sorted(orig_cat_edges) != sorted(cat_fidimo_source_pop_tmp):
         #grass.fatal(_("Vector input map of source populations must must match vector input map that has been used for calculating fidimo distance matrix"))
         raise ValueError(
@@ -1097,7 +1083,20 @@ def fidimo_source_pop( source_pop_csv,
     else:
         print(
             "IDs (categories, cat) of source populations match cats of vector input map that has been used for calculating fidimo distance matrix")
-        
+ 
+     # Delete fidimo_source_pop if exists
+    fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_source_pop_tmp''')
+    fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_source_pop''')
+    
+    fidimo_db.execute("CREATE TABLE fidimo_source_pop_tmp (cat, source_pop, p);")
+ 
+    # Insert source populations into a tmp table          
+    fidimo_db.executemany("INSERT INTO fidimo_source_pop_tmp (cat, source_pop, p) VALUES (?, ?, ?);", source_pop_csv_read_to_db)
+    fidimo_database.commit()
+    
+    fidimo_db.execute(
+        '''CREATE INDEX fidimo_source_pop_tmp_index ON fidimo_source_pop_tmp (cat)''')
+      
     # Create source_pop table in FIDIMO DB
     fidimo_db.execute('''CREATE TABLE fidimo_source_pop AS SELECT
               cat AS cat, orig_cat AS orig_cat, edge_length AS edge_length
