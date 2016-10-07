@@ -630,7 +630,7 @@ def set_fidimo_db(fidimo_dir):
     ''' Create and tables for 
     vertices, edges, fidimo distance and barriers in Fidimo DB'''
     
-    grass_message(_("Copying edges and vertices to FIDIMO database"))
+    grass.message(_("Copying edges and vertices to FIDIMO database"))
     
     fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
