@@ -1263,7 +1263,7 @@ def fidimo_probability( fidimo_dir,
                 continue
                 
             grass.message(_("Calculation of Fidimo probability for direction: " +
-                  j + " and stream order: " + str(i)))
+                  j + " and stream order: " + str(i)+"..."))
             
             # Create temp table to collect rows for a specific stream order
             fidimo_db.execute('''DROP TABLE IF EXISTS fidimo_prob_calculation_tmp''')
@@ -1286,7 +1286,7 @@ def fidimo_probability( fidimo_dir,
             
             for k in range(len(fidimo_prob_calculation_rowid_chunks)):
                 #k=1
-                grass.message(_("Processing chunk: " + str(k + 1) +
+                grass.message(_("...chunk: " + str(k + 1) +
                       " of " + str(len(fidimo_prob_calculation_rowid_chunks))))
                                
                 #chunk = fidimo_prob_calculation_rowid_chunks[k]
@@ -1543,19 +1543,50 @@ def fidimo_summarize( output,
     fidimo_db.execute('''DROP INDEX IF EXISTS fidimo_distance_index_to_orig_v''')
     fidimo_db.execute('''CREATE INDEX fidimo_distance_index_to_orig_v ON fidimo_distance (to_orig_v)''')
 
+    # Split summarize into chunks
+    fidimo_db.execute('''SELECT max(rowid) FROM fidimo_distance''')
+    max_fidimo_distance_rowid = [x[0] for x in fidimo_db.fetchall()][0]
+    fidimo_distance_rowid_chunks = [[x+1,x + 10E5] for x in xrange(0, max_fidimo_distance_rowid, int(10E5))]
+ 
+    # Create temp table to collect subresults
+    fidimo_db.execute('''DROP TABLE IF EXISTS summary_fidimo_result_tmp''')
+    fidimo_db.execute('''DROP INDEX IF EXISTS summary_fidimo_result_tmp_index_to_orig_v''')
+    fidimo_db.execute('''CREATE TEMP TABLE summary_fidimo_result_tmp 
+              (to_orig_v INTEGER, reach_length DOUBLE, fidimo_result DOUBLE, fidimo_result_lwr DOUBLE, fidimo_result_upr DOUBLE)''')
+ 
+    grass.message(_("Summing up fidimo result per target reach..."))
+    for k in range(len(fidimo_distance_rowid_chunks)):
+        grass.message(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))))
 
-    # Summarize fidimo prob for each target reach
-    grass.message(_("Summing up fidimo result per target reach"))
+        # Summarize fidimo prob for each target reach
+        fidimo_db.execute('''INSERT INTO summary_fidimo_result_tmp
+          (to_orig_v,reach_length,fidimo_result,fidimo_result_lwr,fidimo_result_upr)
+          SELECT
+          to_orig_v, 
+          target_edge_length AS reach_length,
+          CAST(SUM(fidimo_result) AS DOUBLE) AS fidimo_result, 
+          CAST(SUM(fidimo_result_lwr) AS DOUBLE) AS fidimo_result_lwr,
+          CAST(SUM(fidimo_result_upr) AS DOUBLE) AS fidimo_result_upr 
+          FROM fidimo_distance 
+          WHERE direction!=3 AND
+          rowid BETWEEN %s and %s
+          GROUP BY to_orig_v;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
+
+        # Commit changes
+        fidimo_database.commit()
+     
+    # Summing up subresults
+    fidimo_db.execute('''CREATE INDEX summary_fidimo_result_tmp_index_to_orig_v ON summary_fidimo_result_tmp (to_orig_v)''')
     fidimo_db.execute('''CREATE TABLE summary_fidimo_result AS SELECT
-    to_orig_v, 
-    target_edge_length AS reach_length,
+    to_orig_v AS to_orig_v, 
+    reach_length AS reach_length,
     CAST(SUM(fidimo_result) AS DOUBLE) AS fidimo_result, 
     CAST(SUM(fidimo_result_lwr) AS DOUBLE) AS fidimo_result_lwr,
     CAST(SUM(fidimo_result_upr) AS DOUBLE) AS fidimo_result_upr 
-    FROM fidimo_distance WHERE direction!=3 GROUP BY to_orig_v;''')
+    FROM summary_fidimo_result_tmp GROUP BY to_orig_v;''')
 
     # Drop index on fidimo_distance (to_orig_v)
-    fidimo_db.execute('''DROP INDEX IF EXISTS fidimo_distance_index_to_orig_v''')
+    fidimo_db.execute('''DROP INDEX IF EXISTS summary_fidimo_result_tmp_index_to_orig_v''')
 
     grass.debug(_("Test 2 fidimo_summarize"),1)
 
