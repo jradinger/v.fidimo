@@ -235,6 +235,11 @@ if grass.verbosity() > 2:
 ############# Define Cleanup ##############
 ###########################################
 
+############ DEFINITION CLEANUP TEMPORARY FILES ##############
+# global variables for cleanup
+global tmp_map_vect
+tmp_map_vect = []
+
 def cleanup():
     if tmp_map_vect and not flags['k']:
         grass.run_command("g.remove",
@@ -1725,11 +1730,6 @@ def main():
     t = options['t']
     statistical_interval = options['statistical_interval']
     seed_fishmove = options['seed_fishmove']
-
-    ############ DEFINITION CLEANUP TEMPORARY FILES ##############
-    # global variables for cleanup
-    global tmp_map_vect
-    tmp_map_vect = []
 
     ############ Start with FIDIMO modules ##############
     # Print out Metadata and exit main function
