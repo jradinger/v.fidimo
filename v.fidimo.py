@@ -58,7 +58,7 @@
 #% description: Barrier point file (vector map)
 #% required: no
 #% guisection: Network parameters
-#% guidependency: passability_col
+#% guidependency: upstream_pass_col,downstream_pass_col
 #%end
 #%option G_OPT_DB_COLUMN
 #% key: upstream_pass_col
