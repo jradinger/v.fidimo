@@ -1818,6 +1818,10 @@ def main():
                        upstream_pass_col=upstream_pass_col,
                        downstream_pass_col=downstream_pass_col,
                        threshold=threshold)
+        
+        # Copying edges, vertices and barriers to fidimo_db
+        set_fidimo_db(fidimo_dir=fidimo_dir)
+        
         return None
 
 
@@ -1843,7 +1847,7 @@ def main():
                        downstream_pass_col=downstream_pass_col,
                        threshold=threshold)
 
-        # Copying edges and vertices etc to fidimo_db
+        # Copying edges, vertices and barriers to fidimo_db
         set_fidimo_db(fidimo_dir=fidimo_dir)
 
         # Calculate distance between single river reaches
