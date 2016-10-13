@@ -780,17 +780,17 @@ def barrier_passability(  g_barriers,
     barrier_pass = [None] * len(all_barriers)
     for i in xrange(len(all_barriers)):
         if not upstream_barriers[i] and not downstream_barriers[i] and not all_barriers[i]: #source=target (i.e no barriers inbetween, passability is unrestricted=1)
-      barrier_pass[i] = 1.0 
-    elif not upstream_barriers[i] and not downstream_barriers[i] and all_barriers[i]: # direction is first downstream then upstream
-        barrier_pass[i] = round(numpy.prod(
-          [g_barriers[x][1] if x in unique_downstream_g_barriers else g_barriers[x][0] for x in all_barriers[i]]
-          ),8)
-    elif upstream_barriers[i] and not downstream_barriers[i] and all_barriers[i]:
-        barrier_pass[i] = round(numpy.prod([g_barriers[x][0] for x in upstream_barriers[i]]),8)
-    elif not upstream_barriers[i] and downstream_barriers[i] and all_barriers[i]:
-        barrier_pass[i] = round(numpy.prod([g_barriers[x][1] for x in downstream_barriers[i]]),8)
-    else:
-        barrier_pass[i] = -9999
+            barrier_pass[i] = 1.0 
+        elif not upstream_barriers[i] and not downstream_barriers[i] and all_barriers[i]: # direction is first downstream then upstream
+            barrier_pass[i] = round(numpy.prod(
+              [g_barriers[x][1] if x in unique_downstream_g_barriers else g_barriers[x][0] for x in all_barriers[i]]
+              ),8)
+        elif upstream_barriers[i] and not downstream_barriers[i] and all_barriers[i]:
+            barrier_pass[i] = round(numpy.prod([g_barriers[x][0] for x in upstream_barriers[i]]),8)
+        elif not upstream_barriers[i] and downstream_barriers[i] and all_barriers[i]:
+            barrier_pass[i] = round(numpy.prod([g_barriers[x][1] for x in downstream_barriers[i]]),8)
+        else:
+            barrier_pass[i] = -9999
         
     return barrier_pass
 
