@@ -371,6 +371,7 @@ def fidimo_network(input,
     
     # Global file for cleanup
     global tmp_map_vect
+    tmp_map_vect = []
     
     # Input stream network
     streams_col_dict = {"strahler": strahler_col, "shreve": shreve_col,
