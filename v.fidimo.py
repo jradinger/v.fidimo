@@ -1815,7 +1815,8 @@ def main():
                        network_col=network_col,
                        barriers=barriers,
                        fidimo_dir=fidimo_dir,
-                       passability_col=passability_col,
+                       upstream_pass_col=upstream_pass_col,
+                       downstream_pass_col=downstream_pass_col,
                        threshold=threshold)
         return None
 
@@ -1838,7 +1839,8 @@ def main():
                        network_col=network_col,
                        barriers=barriers,
                        fidimo_dir=fidimo_dir,
-                       passability_col=passability_col,
+                       upstream_pass_col=upstream_pass_col,
+                       downstream_pass_col=downstream_pass_col,
                        threshold=threshold)
 
         # Copying edges and vertices etc to fidimo_db
