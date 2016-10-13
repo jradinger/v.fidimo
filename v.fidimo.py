@@ -245,6 +245,7 @@ if grass.verbosity() > 2:
 
 ############ DEFINITION CLEANUP TEMPORARY FILES ##############
 # global variables for cleanup
+global tmp_map_vect
 tmp_map_vect = []
 
 def cleanup():
