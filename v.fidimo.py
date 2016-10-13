@@ -367,6 +367,9 @@ def fidimo_network(input,
     
     grass.message(_("Preparing river network for FIDIMO"))
     
+    # Global file for cleanup
+    global tmp_map_vect
+    
     # Input stream network
     streams_col_dict = {"strahler": strahler_col, "shreve": shreve_col,
                         "network": network_col}  # dictionary {'target_name':'input_name'}
@@ -421,6 +424,10 @@ def fidimo_network(input,
               input="fidimo_net1_tmp" + str(os.getpid()),
               output="fidimo_net2_tmp" + str(os.getpid()),
               operation="nodes")
+        
+        # Update files to remove at cleanup
+        tmp_map_vect = tmp_map_vect.extend(['barriers_tmp', 'fidimo_net1_tmp'])
+        
     else:
         grass.message(_("Connect nodes to network"))
         v.net(overwrite=True,
@@ -611,8 +618,7 @@ def fidimo_network(input,
     grass.message(_("Final networks prepared for FIDIMO"))
     
     # Update files to remove at cleanup
-    global tmp_map_vect
-    tmp_map_vect = tmp_map_vect.extend(['streams_tmp', 'barriers_tmp', 'fidimo_net1_tmp','fidimo_net2_tmp','fidimo_net3_tmp',
+    tmp_map_vect = tmp_map_vect.extend(['streams_tmp','fidimo_net2_tmp','fidimo_net3_tmp',
                     'output1_tmp','output2_tmp'])
     
     # Update metadata
@@ -1736,6 +1742,26 @@ def main():
     t = options['t']
     statistical_interval = options['statistical_interval']
     seed_fishmove = options['seed_fishmove']
+    
+    ############### Testing single modules ##################
+    ######### exit main after module is finished ############
+    if flags['t']:
+        # Testing single modules and exit main after module is finished
+        # Set up fidimo_db
+        create_fidimo_db(fidimo_dir=fidimo_dir)
+
+        # Create fidimo network from input data (river shape, barrier points)
+        fidimo_network(input=input,
+                       strahler_col=strahler_col,
+                       shreve_col=shreve_col,
+                       network_col=network_col,
+                       barriers=barriers,
+                       fidimo_dir=fidimo_dir,
+                       passability_col=passability_col,
+                       threshold=threshold)
+        return None
+
+
 
     ############ Start with FIDIMO modules ##############
     # Print out Metadata and exit main function
