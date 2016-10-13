@@ -245,8 +245,8 @@ if grass.verbosity() > 2:
 
 ############ DEFINITION CLEANUP TEMPORARY FILES ##############
 # global variables for cleanup
-global tmp_map_vect
-tmp_map_vect = []
+#global tmp_map_vect
+#tmp_map_vect = []
 
 def cleanup():
     if tmp_map_vect and not flags['k']:
@@ -430,7 +430,7 @@ def fidimo_network(input,
               operation="nodes")
         
         # Update files to remove at cleanup
-        tmp_map_vect = tmp_map_vect.extend(['barriers_tmp', 'fidimo_net1_tmp'])
+        tmp_map_vect.extend(['barriers_tmp', 'fidimo_net1_tmp'])
         
     else:
         grass.message(_("Connect nodes to network"))
@@ -622,7 +622,7 @@ def fidimo_network(input,
     grass.message(_("Final networks prepared for FIDIMO"))
     
     # Update files to remove at cleanup
-    tmp_map_vect = tmp_map_vect.extend(['streams_tmp','fidimo_net2_tmp','fidimo_net3_tmp',
+    tmp_map_vect.extend(['streams_tmp','fidimo_net2_tmp','fidimo_net3_tmp',
                     'output1_tmp','output2_tmp'])
     
     # Update metadata
