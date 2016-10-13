@@ -198,7 +198,7 @@
 #%end
 
 #%rules
-#% requires_all: barriers,passability_col,threshold
+#% requires_all: barriers,upstream_pass_col,downstream_pass_col,threshold
 #%end
 
 
