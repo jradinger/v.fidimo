@@ -170,6 +170,9 @@
 #% key: n
 #% description: Only generate network (incl. barriers) and set up FIDIMO database. Don't calculate dispersal.
 #%end
+#% key: b
+#% description: Consider barriers (if set) as fully passable.
+#%end
 #%flag
 #% key: s
 #% description: Only update source populations. Network must have been generated before. Dispersal is not calculated.
@@ -181,6 +184,9 @@
 #%flag
 #% key: m
 #% description: Print out metadata only and exit
+#%end
+#% key: t
+#% description: Flag for testing single modules
 #%end
 
 #%rules
