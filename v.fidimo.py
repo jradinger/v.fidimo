@@ -210,11 +210,11 @@ import os
 import sys
 import shutil
 import atexit
-from grass.script import core as grass
 import math
 import sqlite3
 import csv
 import gc
+import warning
 
 import igraph
 from igraph import *
@@ -224,9 +224,10 @@ from itertools import repeat
 import datetime
 from timeit import default_timer as timer
 
+from grass.script import core as grass
+from grass.script import db as grass_db
 from grass.pygrass.modules.shortcuts import raster as r
 from grass.pygrass.modules.shortcuts import vector as v
-from grass.pygrass.modules.shortcuts import vector as db
 from grass.pygrass.modules.shortcuts import general as g
 
 # import required numpy/scipy modules
@@ -673,13 +674,14 @@ def set_fidimo_db(fidimo_dir):
                       to_table="edges")
     
     # Copy barriers if exists
-    grass.message(_("Copying barriers to FIDIMO database"))
-    grass.run_command("db.copy",
-                      overwrite=True,
-                      from_table="barriers_tmp"+ str(os.getpid()),
-                      to_database=os.path.join(fidimo_dir,"fidimo_database.db"),
-                      to_table="barriers",
-                      where="network IS NOT NULL")
+    if grass_db.db_table_exist("barriers_tmp"+ str(os.getpid())):
+        grass.message(_("Copying barriers to FIDIMO database"))
+        grass.run_command("db.copy",
+                          overwrite=True,
+                          from_table="barriers_tmp"+ str(os.getpid()),
+                          to_database=os.path.join(fidimo_dir,"fidimo_database.db"),
+                          to_table="barriers",
+                          where="network IS NOT NULL")
     
     # Create fidimo_distance table
     fidimo_db.execute('''CREATE TABLE fidimo_distance (fidimo_distance_id INTEGER PRIMARY KEY, source INTEGER, target INTEGER, distance DOUBLE, direction INTEGER, 
