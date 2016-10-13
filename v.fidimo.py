@@ -61,8 +61,14 @@
 #% guidependency: passability_col
 #%end
 #%option G_OPT_DB_COLUMN
-#% key: passability_col
-#% description: Column name indicating passability rate (0-1) of each barrier
+#% key: upstream_pass_col
+#% description: Column name indicating upstream passability rate (0-1) of each barrier
+#% required: no
+#% guisection: Network parameters
+#%end
+#%option G_OPT_DB_COLUMN
+#% key: downstream_pass_col
+#% description: Column name indicating downstream passability rate (0-1) of each barrier
 #% required: no
 #% guisection: Network parameters
 #%end
@@ -359,7 +365,8 @@ def fidimo_network(input,
                    network_col,
                    fidimo_dir,
                    barriers=None,
-                   passability_col=None,
+                   upstream_pass_col=None,
+                   downstream_pass_col=None,
                    threshold=25):
     '''GRASS Network based on the preprocessed vector input of streams
     and barriers (if present) is calculated (v.net). 
@@ -393,7 +400,8 @@ def fidimo_network(input,
         grass.message(_("Connect barriers and nodes to network"))
         # Input barriers
         # dictionary {'target_name':'input_name'}
-        passability_col_dict = {"passability": passability_col}
+        passability_col_dict = {"upstream_passability": upstream_pass_col,
+                                  "downstream_passability":downstream_pass_col}
         import_vector(input_map=barriers, columns=passability_col_dict,
                       output_map="barriers_tmp" + str(os.getpid()))
         
@@ -664,15 +672,20 @@ def set_fidimo_db(fidimo_dir):
                       to_database=os.path.join(fidimo_dir,"fidimo_database.db"),
                       to_table="edges")
     
+    # Copy barriers if exists
+    grass.message(_("Copying barriers to FIDIMO database"))
+    grass.run_command("db.copy",
+                      overwrite=True,
+                      from_table="barriers_tmp"+ str(os.getpid()),
+                      to_database=os.path.join(fidimo_dir,"fidimo_database.db"),
+                      to_table="barriers",
+                      where="network IS NOT NULL")
+    
     # Create fidimo_distance table
     fidimo_db.execute('''CREATE TABLE fidimo_distance (fidimo_distance_id INTEGER PRIMARY KEY, source INTEGER, target INTEGER, distance DOUBLE, direction INTEGER, 
           from_orig_e INTEGER, to_orig_e INTEGER, from_orig_v INTEGER, to_orig_v INTEGER, source_edge_length DOUBLE, target_edge_length DOUBLE,
           upr_limit DOUBLE, lwr_limit DOUBLE, source_strahler INTEGER, source_shreve INTEGER, 
           target_shreve INTEGER, network INTEGER)''')
-    
-    # Create barriers_along table
-    fidimo_db.execute(
-        '''CREATE TABLE barriers_along (source INTEGER, target INTEGER, barrier INTEGER)''')
     
     # Update metadata
     grass.verbose(_("Updating Metadata"))
@@ -745,6 +758,44 @@ def add_midpoints_fidimo_db(fidimo_dir):
     fidimo_database.close()
 
 
+def barrier_passability(  g_barriers,
+                          g,
+                          v,
+                          to):
+    '''This calculates the cumulative (i.e. multiplicative) passability
+    of barriers from a single node (v) to a list of other nodes (to).
+    It requires therefore a dictionary of barriers with passability rates
+    and the graph of the network '''
+    
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+    
+        upstream_barriers = [[x for x in L if x in g_barriers] for L in g.get_shortest_paths(v=v, to=to, output="vpath", mode="OUT")] 
+        downstream_barriers = [[x for x in L if x in g_barriers] for L in g.get_shortest_paths(v=v, to=to, output="vpath", mode="IN")] 
+        all_barriers = [[x for x in L if x in g_barriers] for L in g.get_shortest_paths(v=v, to=to, output="vpath", mode="ALL")] 
+  
+    unique_upstream_g_barriers = set([item for sublist in upstream_barriers for item in sublist])
+    unique_downstream_g_barriers = set([item for sublist in downstream_barriers for item in sublist])
+  
+    barrier_pass = [None] * len(all_barriers)
+    for i in xrange(len(all_barriers)):
+        if not upstream_barriers[i] and not downstream_barriers[i] and not all_barriers[i]: #source=target (i.e no barriers inbetween, passability is unrestricted=1)
+      barrier_pass[i] = 1.0 
+    elif not upstream_barriers[i] and not downstream_barriers[i] and all_barriers[i]: # direction is first downstream then upstream
+        barrier_pass[i] = round(numpy.prod(
+          [g_barriers[x][1] if x in unique_downstream_g_barriers else g_barriers[x][0] for x in all_barriers[i]]
+          ),8)
+    elif upstream_barriers[i] and not downstream_barriers[i] and all_barriers[i]:
+        barrier_pass[i] = round(numpy.prod([g_barriers[x][0] for x in upstream_barriers[i]]),8)
+    elif not upstream_barriers[i] and downstream_barriers[i] and all_barriers[i]:
+        barrier_pass[i] = round(numpy.prod([g_barriers[x][1] for x in downstream_barriers[i]]),8)
+    else:
+        barrier_pass[i] = -9999
+        
+    return barrier_pass
+
+
+
 def fidimo_distance(fidimo_dir,
                     truncation=-1):
     '''This function fetches all vertices/edges from the
@@ -771,9 +822,9 @@ def fidimo_distance(fidimo_dir,
     
     # Set distance threshold
     if int(truncation) < 0:
-            max_dist = 1e8 # Max distance = 100000 km
+        max_dist = 1e8 # Max distance = 100000 km
     else:
-            max_dist = int(truncation)  
+        max_dist = int(truncation)  
     
     # Update main distance matrix
     #grass.message(_("Update main distance matrix (fidimo_distance) between all connected river reaches..."))
@@ -878,13 +929,18 @@ def fidimo_distance(fidimo_dir,
         
         # Barriers along each path (if exist)
         fidimo_db.execute(
-            '''SELECT cat FROM vertices WHERE v_type=1 and network=?''', str(i))
-        barriers_list = [x[0] for x in fidimo_db.fetchall()]
+            '''SELECT COUNT(*) FROM barriers WHERE network=?''', str(i))
+        n_barriers_network_i = [x[0] for x in fidimo_db.fetchall()]
         
-        if barriers_list:
+        if n_barriers_network_i>0 and not flags["b"]: #add b-flag here
             grass.message(_("Processing barriers along networks paths"))
             
-            g_barriers = [vertices_dict[x] for x in barriers_list]
+            # Get all barriers and passabilities for that specific network
+            fidimo_db.execute(
+                '''SELECT cat,upstream_passability,downstream_passability FROM barriers WHERE network=?''', str(i))
+            barriers_dict = {int(x[0]):[float(x[1]),float(x[0])] for x in fidimo_db.fetchall()}
+
+            g_barriers = {vertices_dict[x]:barriers_dict[x] for x in barriers_dict} ####!!!
             
             for j in xrange(len(midpoints)):
                 # j=0
@@ -1733,7 +1789,8 @@ def main():
     network_col = options['network_col']
     barriers = options['barriers']
     fidimo_dir = options['fidimo_dir']
-    passability_col = options['passability_col']
+    upstream_pass_col = options['upstream_pass_col']
+    downstream_pass_col = options['downstream_pass_col']
     threshold = options['threshold']
     truncation = options['truncation']
 
