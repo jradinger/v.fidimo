@@ -245,8 +245,8 @@ if grass.verbosity() > 2:
 
 ############ DEFINITION CLEANUP TEMPORARY FILES ##############
 # global variables for cleanup
-#global tmp_map_vect
-#tmp_map_vect = []
+global tmp_map_vect
+tmp_map_vect = []
 
 def cleanup():
     if tmp_map_vect and not flags['k']:
@@ -371,8 +371,8 @@ def fidimo_network(input,
     grass.message(_("Preparing river network for FIDIMO"))
     
     # Global file for cleanup
-    global tmp_map_vect
-    tmp_map_vect = []
+    #global tmp_map_vect
+    #tmp_map_vect = []
     
     # Input stream network
     streams_col_dict = {"strahler": strahler_col, "shreve": shreve_col,
