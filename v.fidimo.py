@@ -369,11 +369,7 @@ def fidimo_network(input,
     table and can be distinuished by the v_type column (1: barrier, 2: node)'''
     
     grass.message(_("Preparing river network for FIDIMO"))
-    
-    # Global file for cleanup
-    #global tmp_map_vect
-    #tmp_map_vect = []
-    
+       
     # Input stream network
     streams_col_dict = {"strahler": strahler_col, "shreve": shreve_col,
                         "network": network_col}  # dictionary {'target_name':'input_name'}
