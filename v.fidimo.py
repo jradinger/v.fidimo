@@ -407,6 +407,7 @@ def fidimo_network(input,
                           map="barriers_tmp" + str(os.getpid()),
                           columns="network INTEGER")
         grass.run_command("v.what.vect",
+                          quiet=quiet,
                           map="barriers_tmp" + str(os.getpid()),
                           column="network",
                           query_map="streams_tmp" + str(os.getpid()),
