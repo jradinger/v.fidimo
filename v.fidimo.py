@@ -920,6 +920,7 @@ def fidimo_distance(fidimo_dir,
             del distance_mat_downstream
             gc.collect()
             
+            grass.message(_("Assemble information on distances and directions between reaches considering truncation"))
             paths_array = numpy.array([
                               [x for item in midpoints_chunks[k] for x in repeat(item, len(midpoints))],  # list of all source/from midpoints of reaches
                               midpoints * len(midpoints_chunks[k]), # list of all target/to midpoints of reaches
@@ -942,8 +943,8 @@ def fidimo_distance(fidimo_dir,
                                
                 passability_mat = barrier_passability(  g_barriers_dict=g_barriers_dict,
                                       g=g,
-                                      v=[vertices_dict[x] for x in paths_array_max_dist[0,paths_array_max_dist[0]==j]],
-                                      to=[vertices_dict[x] for x in paths_array_max_dist[1,paths_array_max_dist[0]==j]])
+                                      v=[vertices_dict[x] for x in paths_array_max_dist[0,]],
+                                      to=[vertices_dict[x] for x in paths_array_max_dist[1,]])
                 
                 paths_array_max_dist = numpy.vstack((paths_array_max_dist,[item for sublist in passability_mat for item in sublist]))
 
