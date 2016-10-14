@@ -931,6 +931,7 @@ def fidimo_distance(fidimo_dir,
             
             # Only select those network connection that are below the threshold distance
             paths_array_max_dist = paths_array[:,paths_array[2,:]<max_dist]     
+            grass.verbose(_("Shape of paths_array_max_dist: "+str(paths_array_max_dist.shape)))
                                   
             # Collect garbage to free memory
             del paths_array
