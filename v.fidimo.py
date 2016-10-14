@@ -772,10 +772,9 @@ def unique_ordered(seq):
 
 def barrier_passability(  g_barriers_dict,
                           g,
-                          v,
-                          to):
+                          v_to):
     '''This calculates the cumulative (i.e. multiplicative) passability
-    of barriers from a list of source nodes (v) to a list of target nodes (to).
+    of barriers for a list of tuples, i.e. pairs of source (v) and target nodes (to).
     It requires therefore a dictionary of barriers with passability rates
     and the graph of the network '''
     
