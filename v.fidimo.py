@@ -968,7 +968,7 @@ def fidimo_distance(fidimo_dir,
                                         [vertices_dict[x] for x in paths_array_max_dist[0,]],
                                         [vertices_dict[x] for x in paths_array_max_dist[1,]]))
                 
-                paths_array_max_dist = numpy.vstack((paths_array_max_dist,[item for sublist in passability_mat for item in sublist]))
+                paths_array_max_dist = numpy.vstack((paths_array_max_dist,passability_mat))
 
             else:
                 paths_array_max_dist = numpy.vstack((paths_array_max_dist,[1 for x in range(paths_array_max_dist.shape[1])]))
