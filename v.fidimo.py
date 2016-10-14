@@ -214,7 +214,7 @@ import math
 import sqlite3
 import csv
 import gc
-import warning
+import warnings
 
 import igraph
 from igraph import *
