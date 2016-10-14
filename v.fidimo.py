@@ -687,7 +687,7 @@ def set_fidimo_db(fidimo_dir):
     fidimo_db.execute('''CREATE TABLE fidimo_distance (fidimo_distance_id INTEGER PRIMARY KEY, source INTEGER, target INTEGER, distance DOUBLE, direction INTEGER, 
           from_orig_e INTEGER, to_orig_e INTEGER, from_orig_v INTEGER, to_orig_v INTEGER, source_edge_length DOUBLE, target_edge_length DOUBLE,
           upr_limit DOUBLE, lwr_limit DOUBLE, source_strahler INTEGER, source_shreve INTEGER, 
-          target_shreve INTEGER, network INTEGER)''')
+          target_shreve INTEGER, network INTEGER, passability DOUBLE)''')
     
     # Update metadata
     grass.verbose(_("Updating Metadata"))
@@ -760,39 +760,40 @@ def add_midpoints_fidimo_db(fidimo_dir):
     fidimo_database.close()
 
 
-def barrier_passability(  g_barriers,
+def barrier_passability(  g_barriers_dict,
                           g,
                           v,
                           to):
     '''This calculates the cumulative (i.e. multiplicative) passability
-    of barriers from a single node (v) to a list of other nodes (to).
+    of barriers from a list of source nodes (v) to a list of target nodes (to).
     It requires therefore a dictionary of barriers with passability rates
     and the graph of the network '''
     
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-    
-        upstream_barriers = [[x for x in L if x in g_barriers] for L in g.get_shortest_paths(v=v, to=to, output="vpath", mode="OUT")] 
-        downstream_barriers = [[x for x in L if x in g_barriers] for L in g.get_shortest_paths(v=v, to=to, output="vpath", mode="IN")] 
-        all_barriers = [[x for x in L if x in g_barriers] for L in g.get_shortest_paths(v=v, to=to, output="vpath", mode="ALL")] 
-  
-    unique_upstream_g_barriers = set([item for sublist in upstream_barriers for item in sublist])
-    unique_downstream_g_barriers = set([item for sublist in downstream_barriers for item in sublist])
-  
-    barrier_pass = [None] * len(all_barriers)
-    for i in xrange(len(all_barriers)):
-        if not upstream_barriers[i] and not downstream_barriers[i] and not all_barriers[i]: #source=target (i.e no barriers inbetween, passability is unrestricted=1)
-            barrier_pass[i] = 1.0 
-        elif not upstream_barriers[i] and not downstream_barriers[i] and all_barriers[i]: # direction is first downstream then upstream
-            barrier_pass[i] = round(numpy.prod(
-              [g_barriers[x][1] if x in unique_downstream_g_barriers else g_barriers[x][0] for x in all_barriers[i]]
-              ),8)
-        elif upstream_barriers[i] and not downstream_barriers[i] and all_barriers[i]:
-            barrier_pass[i] = round(numpy.prod([g_barriers[x][0] for x in upstream_barriers[i]]),8)
-        elif not upstream_barriers[i] and downstream_barriers[i] and all_barriers[i]:
-            barrier_pass[i] = round(numpy.prod([g_barriers[x][1] for x in downstream_barriers[i]]),8)
-        else:
-            barrier_pass[i] = -9999
+    barrier_pass =  [[None for i in range(len(to))] for j in range(len(v))]
+    for i in xrange(len(v)):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            upstream_barriers = [[x for x in L if x in g_barriers_dict] for L in g.get_shortest_paths(v=v[i], to=to, output="vpath", mode="OUT")] 
+            downstream_barriers = [[x for x in L if x in g_barriers_dict] for L in g.get_shortest_paths(v=v[i], to=to, output="vpath", mode="IN")] 
+            all_barriers = [[x for x in L if x in g_barriers_dict] for L in g.get_shortest_paths(v=v[i], to=to, output="vpath", mode="ALL")] 
+          
+        unique_upstream_g_barriers = set([item for sublist in upstream_barriers for item in sublist])
+        unique_downstream_g_barriers = set([item for sublist in downstream_barriers for item in sublist])
+        
+        for j in xrange(len(to)):
+            if not upstream_barriers[j] and not downstream_barriers[j] and not all_barriers[j]: #source=target (i.e no barriers inbetween, passability is unrestricted=1)
+                barrier_pass[i][j] = 1.0 
+            elif not upstream_barriers[j] and not downstream_barriers[j] and all_barriers[j]: # direction is first downstream then upstream
+                barrier_pass[i][j] = round(numpy.prod(
+                    [g_barriers_dict[x][1] if x in unique_downstream_g_barriers else g_barriers_dict[x][0] for x in all_barriers[j]]
+                      ),6)
+            elif upstream_barriers[j] and not downstream_barriers[j] and all_barriers[j]:
+                barrier_pass[i][j] = round(numpy.prod([g_barriers_dict[x][0] for x in upstream_barriers[j]]),6)
+            elif not upstream_barriers[j] and downstream_barriers[j] and all_barriers[j]:
+                barrier_pass[i][j] = round(numpy.prod([g_barriers_dict[x][1] for x in downstream_barriers[j]]),6)
+            else:
+                barrier_pass[i][j] = -9999
         
     return barrier_pass
 
@@ -873,6 +874,19 @@ def fidimo_distance(fidimo_dir,
         chunk_size_midpoints = int(100 * round(float(10E6/len(midpoints))/100))
         midpoints_chunks = [midpoints[x:x + chunk_size_midpoints]
                               for x in xrange(0, len(midpoints), chunk_size_midpoints)]
+                              
+        # Check if barriers included in FIDIMO DB and if barriers exist in network i, create barriers_dict if exists
+        fidimo_db.execute('''SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='barriers';''')
+        if sum([x[0] for x in fidimo_db.fetchall()])==1:
+            # Check how many barriers exist in this network
+            fidimo_db.execute('''SELECT COUNT(*) FROM barriers WHERE network=?''', str(i))
+            if [x[0] for x in fidimo_db.fetchall()]>0:
+                # Get all barriers and passabilities for that specific network
+                fidimo_db.execute(
+                        '''SELECT cat,upstream_passability,downstream_passability FROM barriers WHERE network=?''', str(i))
+                    barriers_dict = {int(x[0]):[float(x[1]),float(x[0])] for x in fidimo_db.fetchall()}
+                    g_barriers_dict = {vertices_dict[x]:barriers_dict[x] for x in barriers_dict}
+        g_barriers_dict={}
            
         # Calculate shortest pathss
         grass.message(_("Calculating shortest paths (chunk size: "+str(chunk_size_midpoints)+")..."))
@@ -890,7 +904,7 @@ def fidimo_distance(fidimo_dir,
                                                 target=g_midpoints, weights="half_length", mode="ALL")
             
             # Distinguish between paths up- and downstream [1: downstream, 2:upstream, 3:neither (down-up combination), 4: both directions (e.g. where source=target and dist=0)
-            grass.message(_("Calculating directions between reaches"))
+            grass.message(_("Calculating distances and directions between reaches"))
             
             direction_mat = numpy.select([numpy.isinf(distance_mat_upstream) & ~numpy.isinf(distance_mat_downstream),
                                           numpy.isinf(distance_mat_downstream) & ~numpy.isinf(
@@ -905,56 +919,39 @@ def fidimo_distance(fidimo_dir,
             del distance_mat_downstream
             gc.collect()
             
-            #grass.message(_("Updating distance matrix for specific network"))
-            grass.message(_("Updating distance matrix for specific network and chunk - part 1"))
-            paths_to_db = numpy.array([[x for item in midpoints_chunks[k] for x in repeat(item, len(midpoints))],  # list of all source/from midpoints of reaches
-                              # list of all target/to midpoints of reaches
-                              midpoints * len(midpoints_chunks[k]),
-                              # list of distances
-                              [item for sublist in distance_mat_all for item in sublist],
-                              # list of directions
-                              [item for sublist in direction_mat for item in sublist],
-                              [i] * (len(midpoints)*len(midpoints_chunks[k]))])  # network
+            paths_array = numpy.array([
+                              [x for item in midpoints_chunks[k] for x in repeat(item, len(midpoints))],  # list of all source/from midpoints of reaches
+                              midpoints * len(midpoints_chunks[k]), # list of all target/to midpoints of reaches
+                              [item for sublist in distance_mat_all for item in sublist], # list of distances
+                              [item for sublist in direction_mat for item in sublist], # list of directions
+                              [i] * (len(midpoints)*len(midpoints_chunks[k])) # network
+                              ])  
             
             # Only select those network connection that are below the threshold distance
-            paths_to_db = zip(*paths_to_db[:,paths_to_db[2,:]<max_dist])
-            
-            grass.message(_("Updating distance matrix for specific network and chunk - part 2"))
-            fidimo_db.executemany(
-                "INSERT INTO fidimo_distance (source,target,distance,direction,network) VALUES (?,?,?,?,?)", paths_to_db)
-            fidimo_database.commit()
-                        
+            paths_array_max_dist = paths_array[:,paths_array[2,:]<max_dist]     
+                                  
             # Collect garbage to free memory
-            del paths_to_db
+            del paths_array
             del direction_mat
-            gc.collect()
-        
-        # Barriers along each path (if exist)
-        fidimo_db.execute(
-            '''SELECT COUNT(*) FROM barriers WHERE network=?''', str(i))
-        n_barriers_network_i = [x[0] for x in fidimo_db.fetchall()]
-        
-        if n_barriers_network_i>0 and not flags["b"]: #add b-flag here
-            grass.message(_("Processing barriers along networks paths"))
+            gc.collect() 
             
-            # Get all barriers and passabilities for that specific network
-            fidimo_db.execute(
-                '''SELECT cat,upstream_passability,downstream_passability FROM barriers WHERE network=?''', str(i))
-            barriers_dict = {int(x[0]):[float(x[1]),float(x[0])] for x in fidimo_db.fetchall()}
-
-            g_barriers = {vertices_dict[x]:barriers_dict[x] for x in barriers_dict} ####!!!
-            
-            for j in xrange(len(midpoints)):
-                # j=0
-                vertices_paths = g.get_shortest_paths(v=g_midpoints[j], to=g_midpoints,
-                                                      weights="half_length", output="vpath", mode="ALL")
-                paths_with_barriers = [
-                    [x for x in L if x in g_barriers] for L in vertices_paths]
-                barriers_along = [(midpoints[j], inv_vertices_dict[b], inv_vertices_dict[
-                                   e]) for a, b in zip(paths_with_barriers, g_midpoints) for e in a]
+            # Check if barriers included in FIDIMO DB
+            if g_barriers_dict:
+                grass.message(_("Processing barriers along networks paths"))
+                               
+                passability_mat = barrier_passability(  g_barriers_dict=g_barriers_dict,
+                                      g=g,
+                                      v=[vertices_dict[x] for x in paths_array_max_dist[0,paths_array_max_dist[0]==j]],
+                                      to=[vertices_dict[x] for x in paths_array_max_dist[1,paths_array_max_dist[0]==j]])
                 
-                fidimo_db.executemany(
-                    '''INSERT INTO barriers_along (source,target,barrier) VALUES (?,?,?)''', barriers_along)
+                paths_array_max_dist = numpy.vstack((paths_array_max_dist,[item for sublist in passability_mat for item in sublist]))
+
+            else:
+                paths_array_max_dist = numpy.vstack((paths_array_max_dist,[1 for x in range(paths_array_max_dist.shape[1])]))
+                
+            grass.message(_("Updating distance matrix for specific network and chunk"))
+            fidimo_db.executemany("INSERT INTO fidimo_distance (source,target,distance,direction,network,passability) VALUES (?,?,?,?,?,?)", zip(*paths_array_max_dist))
+            fidimo_database.commit()        
                 
     grass.message(_("All networks processed"))
     
