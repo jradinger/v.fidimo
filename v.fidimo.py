@@ -880,11 +880,11 @@ def fidimo_distance(fidimo_dir,
         if sum([x[0] for x in fidimo_db.fetchall()])==1:
             # Check how many barriers exist in this network
             fidimo_db.execute('''SELECT COUNT(*) FROM barriers WHERE network=?''', str(i))
-            if [x[0] for x in fidimo_db.fetchall()]>0:
+            if [x[0] for x in fidimo_db.fetchall()][0]>0:
                 # Get all barriers and passabilities for that specific network
                 fidimo_db.execute(
                         '''SELECT cat,upstream_passability,downstream_passability FROM barriers WHERE network=?''', str(i))
-                barriers_dict = {int(x[0]):[float(x[1]),float(x[0])] for x in fidimo_db.fetchall()}
+                barriers_dict = {int(x[0]):[float(x[1]),float(x[2])] for x in fidimo_db.fetchall()}
                 g_barriers_dict = {vertices_dict[x]:barriers_dict[x] for x in barriers_dict}
         g_barriers_dict={}
            
