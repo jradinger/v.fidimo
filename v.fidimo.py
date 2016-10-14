@@ -781,10 +781,14 @@ def barrier_passability(  g_barriers_dict,
     
     unique_v = unique_ordered([x[0] for x in v_to])
     
-    #barrier_pass =  [[None for i in range(len(to))] for j in range(len(v))]
-    barrier_pass = []
+    grass.verbose(_(
+        "Calculating barrier passability..."))
     
+    barrier_pass = []
     for i in xrange(len(unique_v)):
+        grass.verbose(_(
+        "...chunk:"+str(i+1)+" of "+str(len(unique_v))))
+        
         to = [x[1] for x in v_to if x[0]==unique_v[i]]
         
         with warnings.catch_warnings():
@@ -848,7 +852,6 @@ def fidimo_distance(fidimo_dir,
         max_dist = int(truncation)  
     
     # Update main distance matrix
-    #grass.message(_("Update main distance matrix (fidimo_distance) between all connected river reaches..."))
     grass.message(_(
         "Updating main distance matrix (fidimo_distance) between all connected river reaches..."))
     
