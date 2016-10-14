@@ -884,8 +884,8 @@ def fidimo_distance(fidimo_dir,
                 # Get all barriers and passabilities for that specific network
                 fidimo_db.execute(
                         '''SELECT cat,upstream_passability,downstream_passability FROM barriers WHERE network=?''', str(i))
-                    barriers_dict = {int(x[0]):[float(x[1]),float(x[0])] for x in fidimo_db.fetchall()}
-                    g_barriers_dict = {vertices_dict[x]:barriers_dict[x] for x in barriers_dict}
+                barriers_dict = {int(x[0]):[float(x[1]),float(x[0])] for x in fidimo_db.fetchall()}
+                g_barriers_dict = {vertices_dict[x]:barriers_dict[x] for x in barriers_dict}
         g_barriers_dict={}
            
         # Calculate shortest pathss
