@@ -760,6 +760,16 @@ def add_midpoints_fidimo_db(fidimo_dir):
     fidimo_database.close()
 
 
+
+
+def unique_ordered(seq):
+    seen = set()
+    seen_add = seen.add
+    return [x for x in seq if not (x in seen or seen_add(x))]
+
+
+
+
 def barrier_passability(  g_barriers_dict,
                           g,
                           v,
@@ -769,34 +779,42 @@ def barrier_passability(  g_barriers_dict,
     It requires therefore a dictionary of barriers with passability rates
     and the graph of the network '''
     
-    barrier_pass =  [[None for i in range(len(to))] for j in range(len(v))]
-    for i in xrange(len(v)):
+    unique_v = unique_ordered([x[0] for x in v_to])
+    
+    #barrier_pass =  [[None for i in range(len(to))] for j in range(len(v))]
+    barrier_pass = []
+    
+    for i in xrange(len(unique_v)):
+        to = [x[1] for x in v_to if x[0]==unique_v[i]]
+        
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             
-            upstream_barriers = [[x for x in L if x in g_barriers_dict] for L in g.get_shortest_paths(v=v[i], to=to, output="vpath", mode="OUT")] 
-            downstream_barriers = [[x for x in L if x in g_barriers_dict] for L in g.get_shortest_paths(v=v[i], to=to, output="vpath", mode="IN")] 
-            all_barriers = [[x for x in L if x in g_barriers_dict] for L in g.get_shortest_paths(v=v[i], to=to, output="vpath", mode="ALL")] 
-          
+            upstream_barriers = [[x for x in L if x in g_barriers_dict] for L in g.get_shortest_paths(v=unique_v[i], 
+              to=to, output="vpath", mode="OUT")] 
+            downstream_barriers = [[x for x in L if x in g_barriers_dict] for L in g.get_shortest_paths(v=unique_v[i], 
+              to=to, output="vpath", mode="IN")] 
+            all_barriers = [[x for x in L if x in g_barriers_dict] for L in g.get_shortest_paths(v=unique_v[i], 
+              to=to, output="vpath", mode="ALL")] 
+        
         unique_upstream_g_barriers = set([item for sublist in upstream_barriers for item in sublist])
         unique_downstream_g_barriers = set([item for sublist in downstream_barriers for item in sublist])
         
         for j in xrange(len(to)):
             if not upstream_barriers[j] and not downstream_barriers[j] and not all_barriers[j]: #source=target (i.e no barriers inbetween, passability is unrestricted=1)
-                barrier_pass[i][j] = 1.0 
+                barrier_pass.append(1.0) 
             elif not upstream_barriers[j] and not downstream_barriers[j] and all_barriers[j]: # direction is first downstream then upstream
-                barrier_pass[i][j] = round(numpy.prod(
-                    [g_barriers_dict[x][1] if x in unique_downstream_g_barriers else g_barriers_dict[x][0] for x in all_barriers[j]]
-                      ),6)
+                barrier_pass.append(round(numpy.prod(
+                [g_barriers_dict[x][1] if x in unique_downstream_g_barriers else g_barriers_dict[x][0] for x in all_barriers[j]]
+                ),6))
             elif upstream_barriers[j] and not downstream_barriers[j] and all_barriers[j]:
-                barrier_pass[i][j] = round(numpy.prod([g_barriers_dict[x][0] for x in upstream_barriers[j]]),6)
+                barrier_pass.append(round(numpy.prod([g_barriers_dict[x][0] for x in upstream_barriers[j]]),6))
             elif not upstream_barriers[j] and downstream_barriers[j] and all_barriers[j]:
-                barrier_pass[i][j] = round(numpy.prod([g_barriers_dict[x][1] for x in downstream_barriers[j]]),6)
+                barrier_pass.append(round(numpy.prod([g_barriers_dict[x][1] for x in downstream_barriers[j]]),6))
             else:
-                barrier_pass[i][j] = -9999
+                barrier_pass.append(-9999)
         
     return barrier_pass
-
 
 
 def fidimo_distance(fidimo_dir,
@@ -944,8 +962,9 @@ def fidimo_distance(fidimo_dir,
                                
                 passability_mat = barrier_passability(  g_barriers_dict=g_barriers_dict,
                                       g=g,
-                                      v=[vertices_dict[x] for x in paths_array_max_dist[0,]],
-                                      to=[vertices_dict[x] for x in paths_array_max_dist[1,]])
+                                      v_to=zip(
+                                        [vertices_dict[x] for x in paths_array_max_dist[0,]],
+                                        [vertices_dict[x] for x in paths_array_max_dist[1,]]))
                 
                 paths_array_max_dist = numpy.vstack((paths_array_max_dist,[item for sublist in passability_mat for item in sublist]))
 
