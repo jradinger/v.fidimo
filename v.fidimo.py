@@ -1803,6 +1803,7 @@ def main():
     ############### Testing single modules ##################
     ######### exit main after module is finished ############
     if flags['t']:
+        grass.warning(_("!!!FIDIMO TEST: This run is only for TESTING purposes and might exhibit unsolicited behaviour!!!"))
         # Testing single modules and exit main after module is finished
         # Set up fidimo_db
         create_fidimo_db(fidimo_dir=fidimo_dir)
@@ -1820,6 +1821,10 @@ def main():
         
         # Copying edges, vertices and barriers to fidimo_db
         set_fidimo_db(fidimo_dir=fidimo_dir)
+        
+        # Calculate distance between single river reaches
+        fidimo_distance(fidimo_dir=fidimo_dir,
+                        truncation=truncation)
         
         return None
 
