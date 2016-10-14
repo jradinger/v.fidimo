@@ -886,7 +886,8 @@ def fidimo_distance(fidimo_dir,
                         '''SELECT cat,upstream_passability,downstream_passability FROM barriers WHERE network=?''', str(i))
                 barriers_dict = {int(x[0]):[float(x[1]),float(x[2])] for x in fidimo_db.fetchall()}
                 g_barriers_dict = {vertices_dict[x]:barriers_dict[x] for x in barriers_dict}
-        g_barriers_dict={}
+        else:
+            g_barriers_dict={}
            
         # Calculate shortest pathss
         grass.message(_("Calculating shortest paths (chunk size: "+str(chunk_size_midpoints)+")..."))
