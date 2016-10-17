@@ -1480,7 +1480,7 @@ def fidimo_probability( fidimo_dir,
     fidimo_database.close()
 
 
-def fidimo_propability_corrected( realisation_flag,
+def fidimo_probability_corrected( realisation_flag,
                         no_barriers_flag,
                         statistical_interval,
                         fidimo_dir):
