@@ -73,7 +73,7 @@
 #% guisection: Network parameters
 #%end
 #%option
-#% key: threshold
+#% key: barrier_threshold
 #% type: string
 #% key_desc: distance
 #% description: Snapping distance threshold of barriers (in m)
@@ -185,8 +185,12 @@
 #% description: Only update source populations. Network must have been generated before. Dispersal is not calculated.
 #%end
 #%flag
+#% key: p
+#% description: Only calculate dispersal probability based on previosely generated network and previousely defined source populations.
+#%end
+#%flag
 #% key: f
-#% description: Only calculate dispersal based on previosely generated network and previousely defined source populations.
+#% description: Finalize fidimo calculations on previosely generated network and previousely defined source populations and create output map.
 #%end
 #%flag
 #% key: m
@@ -198,7 +202,7 @@
 #%end
 
 #%rules
-#% requires_all: barriers,upstream_pass_col,downstream_pass_col,threshold
+#% requires_all: barriers,upstream_pass_col,downstream_pass_col,barrier_threshold
 #%end
 
 
@@ -368,10 +372,10 @@ def fidimo_network(input,
                    barriers=None,
                    upstream_pass_col=None,
                    downstream_pass_col=None,
-                   threshold=25):
+                   barrier_threshold=25):
     '''GRASS Network based on the preprocessed vector input of streams
     and barriers (if present) is calculated (v.net). 
-    Barriers (if present) are snapped to stream network (within threshold) and reaches 
+    Barriers (if present) are snapped to stream network (within barrier_threshold) and reaches 
     are split at barriers. Nodes are connected to streams network and 
     lengths of reaches are updated. Nodes and barriers are stored in attribute
     table and can be distinuished by the v_type column (1: barrier, 2: node)'''
@@ -417,7 +421,7 @@ def fidimo_network(input,
                           column="network",
                           query_map="streams_tmp" + str(os.getpid()),
                           query_column="network",
-                          dmax=threshold)
+                          dmax=barrier_threshold)
         
         # Create network
         v.net(overwrite=True,
@@ -427,7 +431,7 @@ def fidimo_network(input,
               points="barriers_tmp" + str(os.getpid()),
               output="fidimo_net1_tmp" + str(os.getpid()),
               operation="connect",
-              threshold=threshold)
+              threshold=barrier_threshold)
         v.net(overwrite=True,
               quiet=quiet,
               flags="c",
@@ -1129,7 +1133,7 @@ def fidimo_kernel_cdf(x, sigma_stat, sigma_mob, p):
 
 def fidimo_source_pop( source_pop_csv,
                        fidimo_dir,
-                       realisation):
+                       realisation_flag):
     '''This function appends source populations to distance matrix'''
     
     # connect to database
@@ -1222,7 +1226,7 @@ def fidimo_source_pop( source_pop_csv,
         'SELECT orig_cat FROM fidimo_source_pop GROUP BY orig_cat HAVING COUNT(*) > 1;')
     split_reach_cats = [x[0] for x in fidimo_db.fetchall()]
     for i in split_reach_cats:
-        if realisation == True:
+        if realisation_flag == True:
             fidimo_db.execute(
                 'UPDATE fidimo_source_pop SET source_pop = round((source_pop/(SELECT SUM(edge_length) FROM fidimo_source_pop WHERE orig_cat=?))*edge_length,0)  WHERE orig_cat=?', (i, i))
         else:
@@ -1476,7 +1480,8 @@ def fidimo_probability( fidimo_dir,
     fidimo_database.close()
 
 
-def fidimo_realisation( realisation,
+def fidimo_propability_corrected( realisation_flag,
+                        no_barriers_flag,
                         statistical_interval,
                         fidimo_dir):
     '''This function either weights the fidimo probabilities with the value of the value of
@@ -1486,7 +1491,7 @@ def fidimo_realisation( realisation,
     # connect to database
     fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
     fidimo_db = fidimo_database.cursor()
-    
+       
     # First check if fidimo_result already exists in fidimo distance and
     # create if not exist
     fidimo_db.execute('SELECT * FROM fidimo_distance LIMIT 1')
@@ -1500,14 +1505,14 @@ def fidimo_realisation( realisation,
         
     else:
         # Before any calculations set fidimo_result in fidimo_distance to ''
-        grass.debug(_("Test 1 fidimo_realisation"),1)
+        grass.debug(_("Test 1 fidimo_propability_corrected"),1)
         fidimo_db.execute(
         '''UPDATE fidimo_distance SET fidimo_result=NULL,fidimo_result_lwr=NULL,fidimo_result_upr=NULL;''')
     
     fidimo_database.commit()
-    grass.debug(_("Test 2 fidimo_realisation"),1)
+    grass.debug(_("Test 2 fidimo_propability_corrected"),1)
     
-    if realisation == True:
+    if realisation_flag == True:
         grass.message(_(
             "Calculate realisation (i.e. fish counts that disperse from each source population)"))
         
@@ -1532,15 +1537,27 @@ def fidimo_realisation( realisation,
         fidimo_db.execute('''CREATE INDEX fidimo_distance_index_from_orig_v ON fidimo_distance (from_orig_v)''')
         
         for i in source_populations:
-            fidimo_db.execute(
-                '''SELECT fidimo_distance_id, 
-                basic_fidimo_prob, 
-                basic_fidimo_prob_lwr, 
-                basic_fidimo_prob_upr
-                FROM fidimo_distance WHERE from_orig_v = ?''', (i[0],))
-            fidimo_distance_colnames = dict(
-                zip([x[0] for x in fidimo_db.description], range(0, len(fidimo_db.description))))
-            fidimo_distance_array = scipy.array(fidimo_db.fetchall())
+            if no_barriers_flag=False:
+                fidimo_db.execute(
+                    '''SELECT fidimo_distance_id, 
+                    basic_fidimo_prob*passability, 
+                    basic_fidimo_prob_lwr*passability, 
+                    basic_fidimo_prob_upr*passabilty
+                    FROM fidimo_distance WHERE from_orig_v = ?''', (i[0],))
+                fidimo_distance_colnames = dict(
+                    zip([x[0] for x in fidimo_db.description], range(0, len(fidimo_db.description))))
+                fidimo_distance_array = scipy.array(fidimo_db.fetchall())
+            else:
+                fidimo_db.execute(
+                    '''SELECT fidimo_distance_id, 
+                    basic_fidimo_prob, 
+                    basic_fidimo_prob_lwr, 
+                    basic_fidimo_prob_upr
+                    FROM fidimo_distance WHERE from_orig_v = ?''', (i[0],))
+                fidimo_distance_colnames = dict(
+                    zip([x[0] for x in fidimo_db.description], range(0, len(fidimo_db.description))))
+                fidimo_distance_array = scipy.array(fidimo_db.fetchall())
+                
             # Array to collect results
             realised_fidimo_result = fidimo_distance_array[
                 :, fidimo_distance_colnames["fidimo_distance_id"]].astype(int)
@@ -1601,12 +1618,20 @@ def fidimo_realisation( realisation,
         grass.message(_("Updating fidimo_distance with source-population-weighted fidimo probability..."))
         for k in range(len(fidimo_distance_rowid_chunks)):
             grass.message(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))))  # Multiply by value of inital source population
-            fidimo_db.execute('''UPDATE fidimo_distance SET
-                      fidimo_result = basic_fidimo_prob*source_pop,
-                      fidimo_result_lwr = basic_fidimo_prob_lwr*source_pop,
-                      fidimo_result_upr = basic_fidimo_prob_upr*source_pop
-                      WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
-        
+            
+            if no_barriers_flag=False:
+              fidimo_db.execute('''UPDATE fidimo_distance SET
+                        fidimo_result = basic_fidimo_prob_corr*source_pop*passability,
+                        fidimo_result_lwr = basic_fidimo_prob_corr_lwr*source_pop*passability,
+                        fidimo_result_upr = basic_fidimo_prob_corr_upr*source_pop*passability
+                        WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
+            else:
+                fidimo_db.execute('''UPDATE fidimo_distance SET
+                        fidimo_result = basic_fidimo_prob_corr*source_pop,
+                        fidimo_result_lwr = basic_fidimo_prob_corr_lwr*source_pop,
+                        fidimo_result_upr = basic_fidimo_prob_corr_upr*source_pop
+                        WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
+          
     # Update metadata
     grass.verbose(_("Updating Metadata"))
     fidimo_db.execute('''UPDATE meta SET value=? WHERE parameter="Last modified"''',
@@ -1814,7 +1839,7 @@ def main():
     fidimo_dir = options['fidimo_dir']
     upstream_pass_col = options['upstream_pass_col']
     downstream_pass_col = options['downstream_pass_col']
-    threshold = options['threshold']
+    barrier_threshold = options['barrier_threshold']
     truncation = options['truncation']
 
     source_pop_csv = options['source_pop_csv']
@@ -1841,7 +1866,7 @@ def main():
                        fidimo_dir=fidimo_dir,
                        upstream_pass_col=upstream_pass_col,
                        downstream_pass_col=downstream_pass_col,
-                       threshold=threshold)
+                       barrier_threshold=barrier_threshold)
         
         # Copying edges, vertices and barriers to fidimo_db
         set_fidimo_db(fidimo_dir=fidimo_dir)
@@ -1860,7 +1885,7 @@ def main():
         print_metadata(fidimo_dir=options['fidimo_dir'])
         return None
 
-    if not (flags['s'] or flags['f']):
+    if not (flags['s'] or flags['p'] or flags['f']):
         # Set up fidimo_db
         create_fidimo_db(fidimo_dir=fidimo_dir)
 
@@ -1873,7 +1898,7 @@ def main():
                        fidimo_dir=fidimo_dir,
                        upstream_pass_col=upstream_pass_col,
                        downstream_pass_col=downstream_pass_col,
-                       threshold=threshold)
+                       barrier_threshold=barrier_threshold)
 
         # Copying edges, vertices and barriers to fidimo_db
         set_fidimo_db(fidimo_dir=fidimo_dir)
@@ -1882,13 +1907,13 @@ def main():
         fidimo_distance(fidimo_dir=fidimo_dir,
                         truncation=truncation)
 
-    if not (flags['n'] or flags['f']):
+    if not (flags['n'] or flags['p'] or flags['f']):
         # Append source populations
         fidimo_source_pop(source_pop_csv=source_pop_csv,
                           fidimo_dir=fidimo_dir,
-                          realisation=flags['r'])
+                          realisation_flag=flags['r'])
 
-    if not (flags['n'] or flags['s']):
+    if not (flags['n'] or flags['s'] or flags['f']):
         # Calculate dispersal distances
         my_sigma_dict = sigma_calc( l=int(l),
                                     ar=float(ar),
@@ -1900,10 +1925,12 @@ def main():
                            sigma_dict=my_sigma_dict,
                            p=0.67,
                            statistical_interval=statistical_interval)
-
+        
+    if not (flags['n'] or flags['s'] or flags['p']):
         # Calculate realisation or multiplication by value of initial source
         # population
-        fidimo_realisation( realisation=flags['r'],
+        fidimo_probability_corrected( realisation_flag=flags['r'],
+                            no_barriers_flag=flags['b'],
                             statistical_interval=statistical_interval,
                             fidimo_dir=fidimo_dir)
 
