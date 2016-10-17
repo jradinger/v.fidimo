@@ -1537,7 +1537,7 @@ def fidimo_propability_corrected( realisation_flag,
         fidimo_db.execute('''CREATE INDEX fidimo_distance_index_from_orig_v ON fidimo_distance (from_orig_v)''')
         
         for i in source_populations:
-            if no_barriers_flag=False:
+            if no_barriers_flag==False:
                 fidimo_db.execute(
                     '''SELECT fidimo_distance_id, 
                     basic_fidimo_prob*passability, 
@@ -1619,7 +1619,7 @@ def fidimo_propability_corrected( realisation_flag,
         for k in range(len(fidimo_distance_rowid_chunks)):
             grass.message(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))))  # Multiply by value of inital source population
             
-            if no_barriers_flag=False:
+            if no_barriers_flag==False:
               fidimo_db.execute('''UPDATE fidimo_distance SET
                         fidimo_result = basic_fidimo_prob_corr*source_pop*passability,
                         fidimo_result_lwr = basic_fidimo_prob_corr_lwr*source_pop*passability,
