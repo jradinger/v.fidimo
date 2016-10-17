@@ -1621,15 +1621,15 @@ def fidimo_probability_corrected( realisation_flag,
             
             if no_barriers_flag==False:
               fidimo_db.execute('''UPDATE fidimo_distance SET
-                        fidimo_result = basic_fidimo_prob_corr*source_pop*passability,
-                        fidimo_result_lwr = basic_fidimo_prob_corr_lwr*source_pop*passability,
-                        fidimo_result_upr = basic_fidimo_prob_corr_upr*source_pop*passability
+                        fidimo_result = basic_fidimo_prob*source_pop*passability,
+                        fidimo_result_lwr = basic_fidimo_prob_lwr*source_pop*passability,
+                        fidimo_result_upr = basic_fidimo_prob_upr*source_pop*passability
                         WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
             else:
                 fidimo_db.execute('''UPDATE fidimo_distance SET
-                        fidimo_result = basic_fidimo_prob_corr*source_pop,
-                        fidimo_result_lwr = basic_fidimo_prob_corr_lwr*source_pop,
-                        fidimo_result_upr = basic_fidimo_prob_corr_upr*source_pop
+                        fidimo_result = basic_fidimo_prob*source_pop,
+                        fidimo_result_lwr = basic_fidimo_prob_lwr*source_pop,
+                        fidimo_result_upr = basic_fidimo_prob_upr*source_pop
                         WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
           
     # Update metadata
