@@ -798,9 +798,9 @@ def barrier_passability(  g_barriers_dict,
             warnings.simplefilter("ignore")
             
             upstream_barriers = [[x for x in L if x in g_barriers_dict] for L in g.get_shortest_paths(v=unique_v[i], 
-              to=to, output="vpath", mode="OUT")] 
-            downstream_barriers = [[x for x in L if x in g_barriers_dict] for L in g.get_shortest_paths(v=unique_v[i], 
               to=to, output="vpath", mode="IN")] 
+            downstream_barriers = [[x for x in L if x in g_barriers_dict] for L in g.get_shortest_paths(v=unique_v[i], 
+              to=to, output="vpath", mode="OUT")] 
             all_barriers = [[x for x in L if x in g_barriers_dict] for L in g.get_shortest_paths(v=unique_v[i], 
               to=to, output="vpath", mode="ALL")] 
         
@@ -1487,6 +1487,9 @@ def fidimo_probability_corrected( realisation_flag,
     '''This function either weights the fidimo probabilities with the value of the value of
     the source population or calculates realised fish count (real integer values) from the
     probabilities using the multinomial distribution'''
+    
+    grass.message(_(
+            "Correct dispersal probabilities for barriers (if applicable) and for weight by source populations"))
     
     # connect to database
     fidimo_database = sqlite3.connect(os.path.join(fidimo_dir,"fidimo_database.db"))
