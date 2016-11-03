@@ -784,14 +784,14 @@ def barrier_passability(  g_barriers_dict,
     
     unique_v = unique_ordered([x[0] for x in v_to])
     
-    grass.verbose(_(
-        "Calculating barrier passability..."))
+    grass.message(_(
+        "Calculating barrier passability (chunk size: "+len(unique_v)+") ..."))
     
     barrier_pass = []
     for i in xrange(len(unique_v)):
-        grass.percent(i+1,len(unique_v),1)
-        #grass.verbose(_(
-        #"...chunk:"+str(i+1)+" of "+str(len(unique_v))))
+        grass.percent(i,len(unique_v),1)
+        grass.verbose(_(
+        "...chunk:"+str(i+1)+" of "+str(len(unique_v))))
         
         to = [x[1] for x in v_to if x[0]==unique_v[i]]
         
@@ -956,7 +956,7 @@ def fidimo_distance(fidimo_dir,
             
             # Only select those network connection that are below the threshold distance
             paths_array_max_dist = paths_array[:,paths_array[2,:]<max_dist]     
-            grass.verbose(_("Shape of paths_array_max_dist: "+str(paths_array_max_dist.shape)))
+            grass.debug(_("Shape of paths_array_max_dist: "+str(paths_array_max_dist.shape)),1)
                                   
             # Collect garbage to free memory
             del paths_array
