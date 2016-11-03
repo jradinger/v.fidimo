@@ -785,7 +785,7 @@ def barrier_passability(  g_barriers_dict,
     unique_v = unique_ordered([x[0] for x in v_to])
     
     grass.message(_(
-        "Calculating barrier passability (chunk size: "+str(len(unique_v))+") ..."))
+        "Calculating barrier passability (n chunks: "+str(len(unique_v))+") ..."))
     
     barrier_pass = []
     for i in xrange(len(unique_v)):
@@ -1257,7 +1257,7 @@ def fidimo_source_pop( source_pop_csv,
     fidimo_distance_rowid_chunks = [[x+1,x + 10E5] for x in xrange(0, max_fidimo_distance_rowid, int(10E5))]   
     
     # Join table fidimo_distance with fidimo_source_pop
-    grass.message(_("Updating " + str(n_source_pop) + " source populations in fidimo_distance (chunk size:"+str(len(fidimo_distance_rowid_chunks))+") ..." ))
+    grass.message(_("Updating " + str(n_source_pop) + " source populations in fidimo_distance (n chunks:"+str(len(fidimo_distance_rowid_chunks))+") ..." ))
     for k in range(len(fidimo_distance_rowid_chunks)):
         grass.percent(k,len(fidimo_distance_rowid_chunks),1) 
         grass.verbose(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks)))) 
