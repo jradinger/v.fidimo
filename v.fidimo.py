@@ -991,20 +991,21 @@ def fidimo_distance(fidimo_dir,
     max_fidimo_distance_rowid = [x[0] for x in fidimo_db.fetchall()][0]
     fidimo_distance_rowid_chunks = [[x+1,x + 10E5] for x in xrange(0, max_fidimo_distance_rowid, int(10E5))]
     
-    grass.message(_("Updating fidimo_distance database..."))
+    grass.message(_("Updating fidimo_distance database (n chunks: "+str(len(fidimo_distance_rowid_chunks)+") ..."))
     for k in range(len(fidimo_distance_rowid_chunks)):
-        grass.message(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))))
+        grass.percent(k,len(fidimo_distance_rowid_chunks),1)
+        grass.verbose(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))))
         
         # Get cats of original vertices (from-to), Get cats of original edges (from-to)
         #grass.message(_("Updating original vertex categories to fidimo_distance"))
-        grass.message(_("   Updating original vertex categories to fidimo_distance"))
+        grass.verbose(_("   Updating original vertex categories to fidimo_distance"))
         fidimo_db.execute('''UPDATE fidimo_distance SET 
                       from_orig_v = (SELECT orig_cat FROM vertices WHERE cat=fidimo_distance.source),
                       to_orig_v = (SELECT orig_cat FROM vertices WHERE cat=fidimo_distance.target)
                       WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
         fidimo_database.commit()
         
-        grass.message(_("   Updating original river reach (edges) categories to fidimo_distance"))
+        grass.verbose(_("   Updating original river reach (edges) categories to fidimo_distance"))
         fidimo_db.execute('''UPDATE fidimo_distance SET 
                       from_orig_e = (SELECT orig_cat FROM edges WHERE cat=fidimo_distance.from_orig_v),
                       to_orig_e = (SELECT orig_cat FROM edges WHERE cat=fidimo_distance.to_orig_v)
@@ -1012,8 +1013,7 @@ def fidimo_distance(fidimo_dir,
         fidimo_database.commit()
       
         # Get edge lengths, stream order and network id for source (and target) reach
-        #grass.message(_("Updating addtio nal attributes (e.g. stream order) in fidimo_distance"))
-        grass.message(_(
+        grass.verbose(_(
             "   Updating addtional attributes (e.g. stream order) in fidimo_distance"))
         fidimo_db.execute('''UPDATE fidimo_distance SET
                     source_edge_length = (SELECT edge_length FROM edges WHERE cat=fidimo_distance.from_orig_v AND part=1),
