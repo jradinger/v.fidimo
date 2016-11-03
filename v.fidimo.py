@@ -789,8 +789,9 @@ def barrier_passability(  g_barriers_dict,
     
     barrier_pass = []
     for i in xrange(len(unique_v)):
-        grass.verbose(_(
-        "...chunk:"+str(i+1)+" of "+str(len(unique_v))))
+        grass.percent(i+1,len(unique_v),1)
+        #grass.verbose(_(
+        #"...chunk:"+str(i+1)+" of "+str(len(unique_v))))
         
         to = [x[1] for x in v_to if x[0]==unique_v[i]]
         
