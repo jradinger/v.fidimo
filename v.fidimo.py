@@ -997,14 +997,14 @@ def fidimo_distance(fidimo_dir,
         
         # Get cats of original vertices (from-to), Get cats of original edges (from-to)
         #grass.message(_("Updating original vertex categories to fidimo_distance"))
-        grass.message(_("Updating original vertex categories to fidimo_distance"))
+        grass.message(_("   Updating original vertex categories to fidimo_distance"))
         fidimo_db.execute('''UPDATE fidimo_distance SET 
                       from_orig_v = (SELECT orig_cat FROM vertices WHERE cat=fidimo_distance.source),
                       to_orig_v = (SELECT orig_cat FROM vertices WHERE cat=fidimo_distance.target)
                       WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
         fidimo_database.commit()
         
-        grass.message(_("Updating original river reach (edges) categories to fidimo_distance"))
+        grass.message(_("   Updating original river reach (edges) categories to fidimo_distance"))
         fidimo_db.execute('''UPDATE fidimo_distance SET 
                       from_orig_e = (SELECT orig_cat FROM edges WHERE cat=fidimo_distance.from_orig_v),
                       to_orig_e = (SELECT orig_cat FROM edges WHERE cat=fidimo_distance.to_orig_v)
@@ -1014,7 +1014,7 @@ def fidimo_distance(fidimo_dir,
         # Get edge lengths, stream order and network id for source (and target) reach
         #grass.message(_("Updating addtio nal attributes (e.g. stream order) in fidimo_distance"))
         grass.message(_(
-            "Updating addtional attributes (e.g. stream order) in fidimo_distance"))
+            "   Updating addtional attributes (e.g. stream order) in fidimo_distance"))
         fidimo_db.execute('''UPDATE fidimo_distance SET
                     source_edge_length = (SELECT edge_length FROM edges WHERE cat=fidimo_distance.from_orig_v AND part=1),
                     target_edge_length = (SELECT edge_length FROM edges WHERE cat=fidimo_distance.to_orig_v AND part=1),
@@ -1257,9 +1257,10 @@ def fidimo_source_pop( source_pop_csv,
     fidimo_distance_rowid_chunks = [[x+1,x + 10E5] for x in xrange(0, max_fidimo_distance_rowid, int(10E5))]   
     
     # Join table fidimo_distance with fidimo_source_pop
-    grass.message(_("Updating %s source populations in fidimo_distance" %(str(n_source_pop))))
+    grass.message(_("Updating " + str(n_source_pop) + " source populations in fidimo_distance (chunk size:"+str(len(fidimo_distance_rowid_chunks))+") ..." ))
     for k in range(len(fidimo_distance_rowid_chunks)):
-        grass.message(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks)))) 
+        grass.percent(k,len(fidimo_distance_rowid_chunks),1) 
+        grass.verbose(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks)))) 
         fidimo_db.execute('''UPDATE fidimo_distance SET 
                       source_pop = (SELECT source_pop FROM fidimo_source_pop WHERE cat=fidimo_distance.from_orig_v)
                       WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
@@ -1388,7 +1389,8 @@ def fidimo_probability( fidimo_dir,
             
             for k in range(len(fidimo_prob_calculation_rowid_chunks)):
                 #k=1
-                grass.message(_("...chunk: " + str(k + 1) +
+                grass.percent(k,len(fidimo_prob_calculation_rowid_chunks),1)
+                grass.verbose(_("...chunk: " + str(k + 1) +
                       " of " + str(len(fidimo_prob_calculation_rowid_chunks))))
                                
                 #chunk = fidimo_prob_calculation_rowid_chunks[k]
@@ -1605,7 +1607,8 @@ def fidimo_probability_corrected( realisation_flag,
         # Join fidimo_prob with fidimo_distance
         grass.message(_("Updating fidimo_distance with realised fidimo results (i.e. fish counts)..."))
         for k in range(len(fidimo_distance_rowid_chunks)):
-            grass.message(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))))        
+            grass.percent(k,len(fidimo_distance_rowid_chunks),1)
+            grass.verbose(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))))        
             fidimo_db.execute('''UPDATE fidimo_distance SET 
                     fidimo_result = (SELECT fidimo_result FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id),
                     fidimo_result_lwr = (SELECT fidimo_result_lwr FROM realisation_result_tmp WHERE fidimo_distance_id=fidimo_distance.fidimo_distance_id),
@@ -1621,7 +1624,8 @@ def fidimo_probability_corrected( realisation_flag,
         # Join fidimo_prob with fidimo_distance
         grass.message(_("Updating fidimo_distance with source-population-weighted fidimo probability..."))
         for k in range(len(fidimo_distance_rowid_chunks)):
-            grass.message(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))))  # Multiply by value of inital source population
+            grass.percent(k,len(fidimo_distance_rowid_chunks),1)
+            grass.verbose(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))))  # Multiply by value of inital source population
             
             if no_barriers_flag==False:
               fidimo_db.execute('''UPDATE fidimo_distance SET
@@ -1682,7 +1686,8 @@ def fidimo_summarize( output,
  
     grass.message(_("Summing up fidimo result per target reach..."))
     for k in range(len(fidimo_distance_rowid_chunks)):
-        grass.message(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))))
+        grass.percent(k,len(fidimo_distance_rowid_chunks),1)
+        grass.verbose(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))))
 
         # Summarize fidimo prob for each target reach
         fidimo_db.execute('''INSERT INTO summary_fidimo_result_tmp
