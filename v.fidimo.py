@@ -783,10 +783,7 @@ def barrier_passability(  g_barriers_dict,
     and the graph of the network '''
     
     unique_v = unique_ordered([x[0] for x in v_to])
-    
-    grass.message(_(
-        "Calculating cumulative barrier passability (n chunks: "+str(len(unique_v))+") ..."))
-    
+       
     barrier_pass = []
     for i in xrange(len(unique_v)):
         grass.percent(i,len(unique_v),1)
@@ -855,15 +852,11 @@ def fidimo_distance(fidimo_dir,
     else:
         max_dist = int(truncation)  
     
-    # Update main distance matrix
-    grass.message(_(
-        "Updating main distance matrix (fidimo_distance) between all connected river reaches..."))
-    
     fidimo_db.execute('SELECT DISTINCT network FROM edges')
     network_id = [x[0] for x in fidimo_db.fetchall()]
     
     for i in network_id:
-        grass.message(_("   ...processing network ID: %s" % str(i)))
+        grass.message(_("Updating main distance matrix (fidimo_distance) between all connected river reaches for network ID: %s" % str(i)))
         
         # Fetch all edges
         fidimo_db.execute(
@@ -914,11 +907,9 @@ def fidimo_distance(fidimo_dir,
         else:
             g_barriers_dict={}
            
-        # Calculate shortest pathss
-        grass.message(_("Calculating shortest paths (chunk size: "+str(chunk_size_midpoints)+")..."))
-                                      
+        # Calculate shortest paths                              
         for k in range(len(midpoints_chunks)):
-            grass.message(_("...chunk: "+str(k+1)+" of "+str(len(midpoints_chunks))))
+            grass.message(_("Calculating network paths for chunk: "+str(k+1)+" of "+str(len(midpoints_chunks))+" (chunk size:"+str(chunk_size_midpoints)+")..."))
             
             g_midpoints_chunk_k = [vertices_dict[x] for x in midpoints_chunks[k]]
             
@@ -930,7 +921,7 @@ def fidimo_distance(fidimo_dir,
                                                 target=g_midpoints, weights="half_length", mode="ALL")
             
             # Distinguish between paths up- and downstream [1: downstream, 2:upstream, 3:neither (down-up combination), 4: both directions (e.g. where source=target and dist=0)
-            grass.message(_("Calculating distances and directions between reaches"))
+            grass.message(_("...calculating distances and directions between reaches"))
             
             direction_mat = numpy.select([numpy.isinf(distance_mat_upstream) & ~numpy.isinf(distance_mat_downstream),
                                           numpy.isinf(distance_mat_downstream) & ~numpy.isinf(
@@ -945,7 +936,7 @@ def fidimo_distance(fidimo_dir,
             del distance_mat_downstream
             gc.collect()
             
-            grass.message(_("Assemble information on distances and directions between reaches considering truncation"))
+            grass.message(_("...assemble information on distances and directions between reaches considering truncation"))
             paths_array = numpy.array([
                               [x for item in midpoints_chunks[k] for x in repeat(item, len(midpoints))],  # list of all source/from midpoints of reaches
                               midpoints * len(midpoints_chunks[k]), # list of all target/to midpoints of reaches
@@ -965,7 +956,7 @@ def fidimo_distance(fidimo_dir,
             
             # Check if barriers included in FIDIMO DB
             if g_barriers_dict:
-                grass.message(_("Processing barriers along networks paths"))
+                grass.message(_("...calculating cumulative passability of barriers along networks paths"))
                                
                 passability_mat = barrier_passability(  g_barriers_dict=g_barriers_dict,
                                       g=g,
@@ -978,7 +969,7 @@ def fidimo_distance(fidimo_dir,
             else:
                 paths_array_max_dist = numpy.vstack((paths_array_max_dist,[1 for x in range(paths_array_max_dist.shape[1])]))
                 
-            grass.message(_("Updating distance matrix for specific network and chunk"))
+            grass.message(_("...updating distance matrix for specific network and chunk"))
             fidimo_db.executemany("INSERT INTO fidimo_distance (source,target,distance,direction,network,passability) VALUES (?,?,?,?,?,?)", zip(*paths_array_max_dist))
             fidimo_database.commit()        
                 
@@ -998,14 +989,14 @@ def fidimo_distance(fidimo_dir,
         
         # Get cats of original vertices (from-to), Get cats of original edges (from-to)
         #grass.message(_("Updating original vertex categories to fidimo_distance"))
-        grass.verbose(_("   Updating original vertex categories to fidimo_distance"))
+        grass.verbose(_("...updating original vertex categories to fidimo_distance"))
         fidimo_db.execute('''UPDATE fidimo_distance SET 
                       from_orig_v = (SELECT orig_cat FROM vertices WHERE cat=fidimo_distance.source),
                       to_orig_v = (SELECT orig_cat FROM vertices WHERE cat=fidimo_distance.target)
                       WHERE rowid BETWEEN %s and %s;'''%(fidimo_distance_rowid_chunks[k][0],fidimo_distance_rowid_chunks[k][1]))
         fidimo_database.commit()
         
-        grass.verbose(_("   Updating original river reach (edges) categories to fidimo_distance"))
+        grass.verbose(_("...updating original river reach (edges) categories to fidimo_distance"))
         fidimo_db.execute('''UPDATE fidimo_distance SET 
                       from_orig_e = (SELECT orig_cat FROM edges WHERE cat=fidimo_distance.from_orig_v),
                       to_orig_e = (SELECT orig_cat FROM edges WHERE cat=fidimo_distance.to_orig_v)
@@ -1014,7 +1005,7 @@ def fidimo_distance(fidimo_dir,
       
         # Get edge lengths, stream order and network id for source (and target) reach
         grass.verbose(_(
-            "   Updating addtional attributes (e.g. stream order) in fidimo_distance"))
+            "...updating addtional attributes (e.g. stream order) in fidimo_distance"))
         fidimo_db.execute('''UPDATE fidimo_distance SET
                     source_edge_length = (SELECT edge_length FROM edges WHERE cat=fidimo_distance.from_orig_v AND part=1),
                     target_edge_length = (SELECT edge_length FROM edges WHERE cat=fidimo_distance.to_orig_v AND part=1),
@@ -1026,9 +1017,8 @@ def fidimo_distance(fidimo_dir,
         fidimo_database.commit()
         
         # Get upr and lwr limit for later integration based on the reach lengths and distance
-        #grass.message(_("Updating addtional attributes (upper and lower distance limit) in fidimo_distance"))
-        grass.message(_(
-            "Updating addtional attributes (upper and lower distance limit) in fidimo_distance"))
+        grass.verbose(_(
+            "...updating addtional attributes (upper and lower distance limit) in fidimo_distance"))
         fidimo_db.execute('''UPDATE fidimo_distance SET
                     lwr_limit = distance-(target_edge_length/2),
                     upr_limit = distance+(target_edge_length/2)
