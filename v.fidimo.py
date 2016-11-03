@@ -785,7 +785,7 @@ def barrier_passability(  g_barriers_dict,
     unique_v = unique_ordered([x[0] for x in v_to])
     
     grass.message(_(
-        "Calculating barrier passability (n chunks: "+str(len(unique_v))+") ..."))
+        "Calculating cumulative barrier passability (n chunks: "+str(len(unique_v))+") ..."))
     
     barrier_pass = []
     for i in xrange(len(unique_v)):
