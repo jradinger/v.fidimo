@@ -991,7 +991,7 @@ def fidimo_distance(fidimo_dir,
     max_fidimo_distance_rowid = [x[0] for x in fidimo_db.fetchall()][0]
     fidimo_distance_rowid_chunks = [[x+1,x + 10E5] for x in xrange(0, max_fidimo_distance_rowid, int(10E5))]
     
-    grass.message(_("Updating fidimo_distance database (n chunks: "+str(len(fidimo_distance_rowid_chunks)+") ..."))
+    grass.message(_("Updating fidimo_distance database (n chunks: "+str(len(fidimo_distance_rowid_chunks))+") ..."))
     for k in range(len(fidimo_distance_rowid_chunks)):
         grass.percent(k,len(fidimo_distance_rowid_chunks),1)
         grass.verbose(_("...chunk: "+str(k+1)+" of "+str(len(fidimo_distance_rowid_chunks))))
